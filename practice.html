@@ -1,0 +1,2185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>アルティメットFPS 投げ練習モード</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; overscroll-behavior: none;
+    font-family: "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; }
+  .ov { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 18, 36, .80); color: #fff; }
+  .panel { max-width: 680px; max-height: 92vh; overflow: auto; padding: 22px 30px; background: rgba(20, 32, 60, .94);
+    border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  .panel h1 { margin: 0 0 4px; font-size: 22px; }
+  .panel p { margin: 4px 0 10px; color: #c9d3ee; line-height: 1.5; font-size: 14px; }
+  .panel table { border-collapse: collapse; width: 100%; font-size: 13px; margin-bottom: 14px; }
+  .panel td { padding: 3px 6px; border-bottom: 1px solid rgba(255,255,255,.12); vertical-align: top; }
+  .panel td:first-child { color: #9fb3ff; white-space: nowrap; width: 150px; }
+  .big { font: inherit; font-size: 18px; padding: 10px 28px; border: 0; border-radius: 8px;
+    background: #7889FB; color: #fff; cursor: pointer; }
+  .only-touch { display: none; }
+  body.touch .only-touch { display: table-row-group; }
+  body.touch .only-pc { display: none; }
+  #menuBtn { position: absolute; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right));
+    width: 44px; height: 44px; border-radius: 10px; border: 0; background: rgba(16,24,44,.65); color: #fff;
+    font-size: 22px; cursor: pointer; display: none; }
+  #menu { position: absolute; top: 58px; right: 8px; width: 260px; max-height: calc(100vh - 70px); overflow: auto;
+    background: rgba(16,24,44,.94); border-radius: 12px; padding: 10px; display: none; color: #fff; }
+  #menu h3 { margin: 6px 4px 6px; font-size: 13px; color: #C7CDFD; }
+  #menu button { display: block; width: 100%; margin: 4px 0; padding: 9px 10px; border: 0; border-radius: 8px;
+    background: rgba(255,255,255,.1); color: #fff; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+  #menu button.on { background: rgba(120,137,251,.85); }
+  #rotate { display: none; z-index: 10; text-align: center; font-size: 20px; line-height: 1.7; }
+  @media (orientation: portrait) { body.touch #rotate { display: flex; } }
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Ultimate FPS">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1830">
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="menuBtn" aria-label="設定">⚙</button>
+<div id="menu"></div>
+<div id="overlay" class="ov"><div class="panel">
+  <h1>投げ練習モード</h1>
+  <p>自陣エンドゾーンの線の上に立ってディスクを投げる練習。立っている味方（青）にパスを通してみよう。</p>
+  <table>
+    <tbody class="only-touch">
+      <tr><td>画面の左半分をドラッグ</td><td>首を振る（設定でスマホを傾けて首を振るジャイロも使える）</td></tr>
+      <tr><td>味方をタップ</td><td>おまかせパス（走る先・強さ・角度・曲がりを自動で決めて投げる）</td></tr>
+      <tr><td>右下のディスクからなぞる</td><td>自分で投げる。なぞる向き＝方向、なぞった長さ＝強さ、指の曲がり＝カーブ</td></tr>
+      <tr><td>左下のパッド</td><td>ピボット。指を左右に動かすと踏み出す足の向き（左右の端＝真横、真ん中＝真後ろ）、上下に動かすと離す高さ（下ほど低い姿勢）。右利きなら 上の段: 左＝スクーバ／真ん中＝ハンマー／右＝ハイフォア、中〜下: 左＝バックハンド／右＝フォアハンド</td></tr>
+      <tr><td>右上の ⚙</td><td>補助・ジャイロ・利き手・視点などの設定</td></tr>
+    </tbody>
+    <tbody class="only-pc">
+      <tr><td>マウス移動</td><td>首を振る</td></tr>
+      <tr><td>味方に照準を合わせて短くクリック</td><td>おまかせパス（走る先・強さ・角度・曲がりを自動で決めて投げる）</td></tr>
+      <tr><td>左クリック長押し → 離す</td><td>自分で投げる（ためた長さ＝強さ）</td></tr>
+      <tr><td>A・D／W・S 長押し</td><td>ピボット。A・D で足の向き、W・S で離す高さを少しずつ動かす（上の段はスクーバ・ハンマー・ハイフォア）</td></tr>
+      <tr><td>ホイール ／ Shift＋ホイール</td><td>ハイザー角 ／ ノーズ角（補助1をオフにしたときだけ）</td></tr>
+      <tr><td>1 / 2 / 3 ／ G</td><td>補助（ノーズ自動／照準補正／予想軌道）の切り替え ／ 全部まとめて</td></tr>
+      <tr><td>C ／ T ／ L ／ M ／ Backspace</td><td>視点 ／ スロー ／ 利き手 ／ 味方が動く ／ 軌跡を消す（右上の ⚙ からも操作できる）</td></tr>
+    </tbody>
+  </table>
+  <button id="start" class="big">タップして開始</button>
+</div></div>
+<div id="rotate" class="ov"><div>📱↻<br>スマホを横向きにしてください</div></div>
+<script>
+/* ============================================================
+ * disc_physics.js  ― アルティメットのディスク（175g）の飛行計算
+ *
+ * 座標の決め方（ゲーム全体で共通）
+ *   x: フィールドの横方向（0〜37m）。攻める方向を向いたとき右が +x
+ *   y: フィールドの縦方向（0〜100m）。攻める方向が +y
+ *   z: 高さ（地面が 0）
+ *
+ * 計算のしかた（なぜこうするか）
+ *   ディスクは「空気の力（揚力・抗力）」と「回転（ジャイロ効果）」で飛ぶ。
+ *   - 揚力・抗力: 迎え角（空気がディスクの裏にどれだけ当たるか）で大きさが決まる
+ *   - 縦に回そうとする力（ピッチングモーメント）が働くと、ディスクは回転しているので
+ *     コマと同じ原理で「横に傾く」。これがターン（まくれ）とフェード（最後の流れ）の正体
+ *   そのため、ディスクの向き（裏表の向き = 法線ベクトル n）と回転数 w を毎瞬計算する。
+ *
+ * 使っている係数（出典）
+ *   揚力・抗力: Morrison (2005) "The Physics of Frisbees" の値
+ *               （Potts & Crowther の風洞実験をもとにしたもの）
+ *   ピッチングモーメント・回転の減り方: Hummel (2003) の飛行データから推定した値
+ *               （Hummel の MATLAB コードの記載値。二次情報なので要原典確認）
+ *   迎え角が大きいとき（ハンマー等）は、平板に近い特性へなめらかにつなぐ（独自の近似）
+ * ============================================================ */
+(function (global) {
+  'use strict';
+
+  const G = 9.81;          // 重力加速度 [m/s^2]
+  const RHO = 1.23;        // 空気の密度 [kg/m^3]
+  const MASS = 0.175;      // ディスクの重さ [kg]（公式球 175g）
+  const AREA = 0.057;      // ディスクの面積 [m^2]（Hummel）
+  const DIAM = 0.269;      // 直径 [m]（AREA から逆算）
+  const IZZ = 0.002352;    // 回転軸まわりの慣性モーメント [kg m^2]（Hummel）
+
+  const COEF = {
+    CL0: 0.10,                    // 迎え角0での揚力係数（Morrison）
+    CLA: 1.4,                     // 迎え角1radあたりの揚力の増え方（Morrison）
+    CD0: 0.08,                    // 最小の抗力係数（Morrison）
+    CDA: 2.72,                    // 抗力の増え方（Morrison）
+    ALPHA0: -4 * Math.PI / 180,   // 抗力が最小になる迎え角（Morrison）
+    // ピッチングモーメント（ディスクを横に傾ける力の元）
+    //   Hummel の推定値（CM0=-0.0821, CMA=0.4338）をそのまま使うと、
+    //   20m/s の平らなバックハンドが1秒で約70°右へまくれて裏返ってしまい、実際と合わない。
+    //   （Hummel は回転による横揺れの項 CRr なども含めた一式で推定しているため、
+    //     この項だけ抜き出すと効きすぎると考えられる）
+    //   そこで「平らに投げたバックハンドは最後に左へ1〜2m流れる」
+    //   「ハイザー20°で左へ5m前後」「ハンマーは左へ曲がって裏返る」に合うよう調整した値を使う。
+    CM0: 0.0,
+    CMA: 0.15,
+    CNR: -3.41e-5,                // 回転が減る度合い（Hummel, long flight）
+  };
+  // 風（空気が動く速さ）。高さ 6m での値。地面に近いほど弱い（低いパスは流されにくい）
+  let WIND = [0, 0, 0];
+  const WIND_REF = 6, WIND_EXP = 0.45;
+  function windAt(z) {
+    if (!WIND[0] && !WIND[1]) return null;
+    const f = Math.min(1.4, Math.pow(Math.max(z, 0.3) / WIND_REF, WIND_EXP));
+    return [WIND[0] * f, WIND[1] * f, 0];
+  }
+  const ALPHA_LIN = 0.40;         // これより迎え角が大きいと失速域として扱う [rad]（約23°）
+
+  // ---- 小さなベクトル計算 ----
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const len = (a) => Math.hypot(a[0], a[1], a[2]);
+  const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const norm = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const DEG = Math.PI / 180;
+
+  // ---- 空力係数（迎え角 alpha [rad] → CL, CD, CM）----
+  function coefficients(alpha) {
+    const a = Math.abs(alpha), sg = alpha < 0 ? -1 : 1;
+    // 通常域（実験値の直線・二次式）
+    const clLin = COEF.CL0 + COEF.CLA * alpha;
+    const cdLin = COEF.CD0 + COEF.CDA * (alpha - COEF.ALPHA0) ** 2;
+    const cmLin = COEF.CM0 + COEF.CMA * alpha;
+    if (a <= ALPHA_LIN - 0.15) return { CL: clLin, CD: cdLin, CM: cmLin };
+    // 失速域: 平板の特性（揚力は sin2α、抗力は 90°で最大）へなめらかにつなぐ
+    const w = smooth((a - (ALPHA_LIN - 0.15)) / 0.30);
+    const clPlate = 1.0 * Math.sin(2 * alpha);
+    const ac = sg * ALPHA_LIN;
+    const cdC = COEF.CD0 + COEF.CDA * (ac - COEF.ALPHA0) ** 2;
+    const t = clamp((a - ALPHA_LIN) / (Math.PI / 2 - ALPHA_LIN), 0, 1);
+    const cdPlate = a <= ALPHA_LIN ? cdLin : cdC + (1.15 - cdC) * (1 - Math.cos(Math.PI * t)) / 2;
+    const cmC = COEF.CM0 + COEF.CMA * ac;
+    const cmPlate = a <= ALPHA_LIN ? cmLin : cmC * (1 - t);
+    return {
+      CL: clLin * (1 - w) + clPlate * w,
+      CD: a <= ALPHA_LIN ? cdLin : cdPlate,
+      CM: cmLin * (1 - w) + cmPlate * w,
+    };
+  }
+
+  // ---- 運動方程式: 状態 s → 変化率 ----
+  // s = { p:[x,y,z], v:[vx,vy,vz], n:[nx,ny,nz]（表面の向き）, w:回転速度[rad/s]（n まわり正）}
+  function derivative(s) {
+    const v = s.v, n = s.n;
+    const wz = windAt(s.p[2]), va = wz ? [v[0] - wz[0], v[1] - wz[1], v[2]] : v;   // 空気に対する速さ（風の分を引く）
+    const sp = len(va);
+    const out = { p: v, v: [0, 0, -G], n: [0, 0, 0], w: 0, alpha: 0 };
+    if (sp < 1e-4) return out;
+    const vh = scale(va, 1 / sp);
+    const vn = clamp(dot(vh, n), -1, 1);
+    const alpha = -Math.asin(vn);                 // 迎え角（裏に空気が当たる向きが正）
+    const c = coefficients(alpha);
+    const q = 0.5 * RHO * sp * sp;                // 動圧
+
+    // 揚力の向き: 速度に垂直で、表面側
+    let lift = sub(n, scale(vh, vn));
+    const ll = len(lift);
+    lift = ll > 1e-6 ? scale(lift, 1 / ll) : [0, 0, 0];
+    const F = add(scale(lift, q * AREA * c.CL), scale(vh, -q * AREA * c.CD));
+    out.v = [F[0] / MASS, F[1] / MASS, F[2] / MASS - G];
+
+    // ピッチングモーメント → ジャイロ効果でディスクが傾く
+    let fp = sub(vh, scale(n, vn));               // ディスク面内の進行方向
+    const fl = len(fp);
+    if (fl > 1e-6) {
+      fp = scale(fp, 1 / fl);
+      const axis = cross(fp, n);                  // 機首上げ回転の軸
+      const M = q * AREA * DIAM * c.CM;
+      const wEff = Math.abs(s.w) < 5 ? (s.w < 0 ? -5 : 5) : s.w; // 回転ゼロ付近の発散よけ
+      out.n = scale(axis, M / (IZZ * wEff));      // 角運動量 Izz*w*n の変化 = トルク
+    }
+    // 回転の減衰
+    out.w = q * AREA * DIAM * COEF.CNR * s.w / IZZ;
+    out.alpha = alpha;
+    return out;
+  }
+
+  function addScaled(s, d, h) {
+    return {
+      p: add(s.p, scale(d.p, h)), v: add(s.v, scale(d.v, h)),
+      n: norm(add(s.n, scale(d.n, h))), w: s.w + d.w * h,
+    };
+  }
+
+  // 4次のルンゲ＝クッタ法で h 秒進める（精度のため）
+  function rk4(s, h) {
+    const k1 = derivative(s);
+    const k2 = derivative(addScaled(s, k1, h / 2));
+    const k3 = derivative(addScaled(s, k2, h / 2));
+    const k4 = derivative(addScaled(s, k3, h));
+    const comb = (key) => {
+      const a = k1[key], b = k2[key], c = k3[key], d = k4[key];
+      if (typeof a === 'number') return (a + 2 * b + 2 * c + d) / 6;
+      return [0, 1, 2].map((i) => (a[i] + 2 * b[i] + 2 * c[i] + d[i]) / 6);
+    };
+    const ns = addScaled(s, { p: comb('p'), v: comb('v'), n: comb('n'), w: comb('w') }, h);
+    ns.alpha = k1.alpha;
+    return ns;
+  }
+
+  // ---- 投げ方の定義（右利き基準。左利きは左右を反転）----
+  // spin: 上から見た回転の向き（-1 = 時計回り）
+  // roll: 基本の傾き（+ = 表面が右を向く）[deg]
+  // release: 体に対する離す位置（右, 前, 高さ）[m]
+  const THROW_TYPES = {
+    // wrist: 手首の構造による「自然なアンハイザー」[deg]。平らのつもりで投げても少し外側が上がるため、
+    //   右利きならバックハンドは右へ、フォアハンドは左へ曲がるのが基本（2026-11-17 林さんの指摘）。
+    //   12° は「20m/s・30mのパスで横に約2m、45mで約5m曲がる」強さ
+    backhand: { label: 'バックハンド', spin: -1, roll: 0, wrist: 12, release: [-0.45, 0.35, 1.00] },
+    forehand: { label: 'フォアハンド', spin: +1, roll: 0, wrist: 12, release: [0.55, 0.40, 0.85] },
+    // ハンマー: 縦（表面が左向き）で離し、飛びながらだんだん裏返って、捕るころには裏向きで平らになる。
+    //   最初は少し左上へ、裏返るにつれて右へ曲がる（右利き）。
+    //   頭上からの投げは手首のスナップが効きにくく回転が少ない（spinScale）。回転が少ないほど早く裏返る。
+    //   roll -93°・回転0.4倍は「縦で離す → 捕球時に裏向きでほぼ平ら」に合うよう調整した値
+    hammer:   { label: 'ハンマー',     spin: +1, roll: -93, spinScale: 0.4, release: [0.30, 0.20, 2.00] },
+    // スクーバ（右利き）: 手の甲を左の頬に構え（ディスクは裏返し）、右肩・左肩・手が一直線になる所で離す（体の真ん中から左へ 0.6m・高さ 1.5m）。
+    //   曲がる向きはハンマーと同じ（傾き・回転の向きを同じにする）。回転はハンマーよりさらに少なく（0.25倍）、ハンマーより早く裏返る
+    scoober:  { label: 'スクーバ',     spin: +1, roll: -110, spinScale: 0.25, release: [-0.60, 0.15, 1.50] },   // 離す時点でハンマー（-93°）よりもう少し裏返っている
+    // ハイフォア: フォアハンドを頭の横の高い所で離す（マークの手の上を通しやすい）
+    // ヘリコプター: 裏返しで平らに、回転多めで高く上げる。上で平らに回りながら、真下へゆっくり落ちてくる
+    heli:     { label: 'ヘリコプター', spin: +1, roll: 180, spinScale: 1.3, release: [0.25, 0.20, 1.95] },
+    highfore: { label: 'ハイフォア',   spin: +1, roll: 0, wrist: 12, release: [0.45, 0.30, 1.75] },
+  };
+
+  /**
+   * 投げた瞬間の状態をつくる
+   * o = {
+   *   foot:[x,y]   投げる人の足元（ピボット後）
+   *   yaw          向き [rad]（0 = +y 方向、右回りが正）
+   *   launch       打ち出し角度 [deg]（上向き正）
+   *   speed        初速 [m/s]
+   *   nose         ノーズ角 [deg]（前側を上げると正 = 浮きやすい）
+   *   hyzer        ハイザー角 [deg]（正 = ハイザー＝フェード側に傾く、負 = アンハイザー）。手首のクセからの差で指定
+   *   wristBias    手首のクセ（自然なアンハイザー）[deg]。省略すると投げ方ごとの標準値
+   *   type         'backhand' | 'forehand' | 'hammer'
+   *   hand         'R' | 'L'
+   *   spinRatio    回転の強さ（1 = 標準）
+   * }
+   */
+  function makeThrow(o) {
+    const T = THROW_TYPES[o.type] || THROW_TYPES.backhand;
+    const mirror = o.hand === 'L' ? -1 : 1;
+    const spinSign = T.spin * mirror;
+    const yaw = o.yaw, la = o.launch * DEG;
+    const f = [Math.sin(yaw) * Math.cos(la), Math.cos(yaw) * Math.cos(la), Math.sin(la)];
+    const r = norm([Math.cos(yaw), -Math.sin(yaw), 0]);   // 投げる人から見て右
+    const up = cross(r, f);
+    // ノーズ角: 表面の向きを後ろへ倒す
+    const nose = o.nose * DEG;
+    let n = norm(add(scale(up, Math.cos(nose)), scale(f, -Math.sin(nose))));
+    // ハイザー角: フェードする側（時計回りなら左）へ表面を傾けるのがハイザー
+    const fadeSide = spinSign < 0 ? -1 : 1;            // -1 = 左, +1 = 右
+    // 実際のハイザー角 = 入力したハイザー角 − 手首のクセ（自然なアンハイザー）
+    const wrist = o.wristBias !== undefined ? o.wristBias : (T.wrist || 0);
+    const rollRight = ((o.hyzer - wrist) * fadeSide + T.roll * mirror) * DEG;
+    n = norm(add(scale(n, Math.cos(rollRight)), scale(r, Math.sin(rollRight))));
+    // 離す位置
+    const fr = [Math.sin(yaw), Math.cos(yaw), 0];
+    const rel = T.release;
+    const p = [
+      o.foot[0] + r[0] * rel[0] * mirror + fr[0] * rel[1],
+      o.foot[1] + r[1] * rel[0] * mirror + fr[1] * rel[1],
+      Math.max(0.3, rel[2] - (o.drop || 0)),   // drop: 低い姿勢で下がった分（ピボットで横へ踏み出すほど低い）
+    ];
+    // 回転数: 強く投げるほど速く回る（標準で 20m/s のとき約 12回転/秒）
+    const wAbs = (3.0 * o.speed + 15) * (o.spinRatio || 1) * (T.spinScale || 1);
+    return {
+      p, v: scale(f, o.speed), n, w: spinSign * wAbs, t: 0,
+      phase: 'flight',   // flight → ground（地面を滑る・転がる）→ rest
+      landing: null,     // 最初に地面に触れた地点と時刻
+      maxZ: p[2], alpha: 0, spinAngle: 0,
+      start: p.slice(), dir: f, right: r,
+      // sCurve: { t0: 何秒後から, rate: 1秒に何度, max: 合計何度 } 内側（フェードする側）へ傾きを戻す（ビッグカーブの「戻り」）
+      sc: o.sCurve ? { t0: o.sCurve.t0, rate: o.sCurve.rate * DEG, max: o.sCurve.max * DEG, acc: o.sCurve.acc || 0, k: o.sCurve.k || 0, kappa: o.sCurve.kappa || 0, turnMax: (o.sCurve.turnMax || 0) * DEG, turned: 0, done: 0, fs: o.sCurve.fs || fadeSide } : undefined,   // fs: 曲がる向き（指定が無ければ回転で自然に曲がる側）   // k: 三日月の弧（1秒に曲げるラジアン）
+    };
+  }
+
+  // ---- 1ステップ進める（地面との接触も扱う）----
+  function step(d, dt) {
+    if (d.phase === 'rest') return d;
+    d.spinAngle += d.w * dt;
+    if (d.phase === 'flight') {
+      const sub2 = 4;                                   // 精度のため細かく刻む
+      for (let i = 0; i < sub2; i++) {
+        const h = dt / sub2;
+        const ns = rk4(d, h);
+        d.p = ns.p; d.v = ns.v; d.n = ns.n; d.w = ns.w; d.alpha = ns.alpha;
+        if (d.sc && d.t > d.sc.t0) {   // ビッグカーブの戻り: 内側（フェードする側）へ引き戻す力と、見た目の傾きの戻し
+          const hl = Math.hypot(d.v[0], d.v[1]) || 1, side = [d.v[1] / hl, -d.v[0] / hl, 0];
+          if (d.sc.acc) d.v = add(d.v, scale(side, d.sc.fs * d.sc.acc * h));
+          if (d.sc.kappa && d.sc.turned < d.sc.turnMax) { d.v = add(d.v, scale(side, d.sc.fs * d.sc.kappa * hl * hl * h)); d.sc.turned += d.sc.kappa * hl * h; }   // 円の弧: 1mあたり一定の角度だけ向きが曲がる
+          else if (d.sc.k && d.sc.turned < d.sc.turnMax) { d.v = add(d.v, scale(side, d.sc.fs * d.sc.k * hl * h)); d.sc.turned += d.sc.k * h; }   // 三日月の弧: 速さに比例して横へ＝一定の割合で向きが曲がる
+          if (d.sc.done < d.sc.max) { const dq = Math.min(d.sc.rate * h, d.sc.max - d.sc.done); d.sc.done += dq; d.n = norm(add(d.n, scale(side, d.sc.fs * dq))); }
+        }
+        d.t += h;
+        if (d.p[2] > d.maxZ) d.maxZ = d.p[2];
+        if (d.p[2] <= 0.02) { touchGround(d); break; }
+      }
+      return d;
+    }
+    // 地面の上
+    d.t += dt;
+    const hv = [d.v[0], d.v[1], 0], hs = len(hv);
+    if (d.groundMode === 'roll') {
+      // ローラー: 傾いた側へ曲がりながら転がり、遅くなると倒れる
+      const ns2 = hs - 1.5 * dt;
+      const turn = d.rollTurn * dt;
+      const c = Math.cos(turn), s = Math.sin(turn);
+      const dir = hs > 1e-6 ? [hv[0] / hs, hv[1] / hs] : [0, 1];
+      const nd = [dir[0] * c - dir[1] * s, dir[0] * s + dir[1] * c];
+      if (ns2 <= 1.5) { d.groundMode = 'skid'; d.v = [nd[0] * 1.5, nd[1] * 1.5, 0]; }
+      else d.v = [nd[0] * ns2, nd[1] * ns2, 0];
+    } else {
+      const ns2 = Math.max(0, hs - 5.0 * dt);         // 芝の上を滑る（摩擦で止まる）
+      d.v = hs > 1e-6 ? [hv[0] / hs * ns2, hv[1] / hs * ns2, 0] : [0, 0, 0];
+      d.n = norm(add(d.n, scale([0, 0, d.n[2] >= 0 ? 1 : -1], 6 * dt)));   // 平らに寝る
+      d.w *= Math.max(0, 1 - 3 * dt);
+      if (ns2 < 0.05) { d.phase = 'rest'; d.v = [0, 0, 0]; }
+    }
+    d.p = [d.p[0] + d.v[0] * dt, d.p[1] + d.v[1] * dt, d.groundMode === 'roll' ? DIAM / 2 : 0.01];
+    return d;
+  }
+
+  function touchGround(d) {
+    d.landing = { p: [d.p[0], d.p[1], 0], t: d.t, v: d.v.slice(), n: d.n.slice() };
+    d.phase = 'ground';
+    const tilt = Math.acos(Math.min(1, Math.abs(d.n[2])));   // 地面に対する傾き
+    const hs = Math.hypot(d.v[0], d.v[1]);
+    if (tilt > 55 * DEG && hs > 4 && Math.abs(d.w) > 20) {
+      d.groundMode = 'roll';
+      // 表面が向いている側と回転方向で、曲がる向きが決まる（簡易）
+      const hdir = [d.v[0] / hs, d.v[1] / hs];
+      const side = Math.sign(d.n[0] * -hdir[1] + d.n[1] * hdir[0]) || 1;
+      d.rollTurn = side * 0.6 * Math.cos(tilt) * 3;
+    } else {
+      d.groundMode = 'skid';
+      // 着地で速度の一部を失う
+      d.v = [d.v[0] * 0.55, d.v[1] * 0.55, 0];
+    }
+    d.p[2] = 0.01;
+  }
+
+  /** 着地まで（または maxT 秒まで）まとめて計算し、軌跡を返す */
+  function simulate(o, maxT = 12, dt = 1 / 120) {
+    const d = makeThrow(o);
+    const pts = [d.p.slice()];
+    while (d.phase === 'flight' && d.t < maxT) {
+      step(d, dt);
+      pts.push(d.p.slice());
+    }
+    return { disc: d, points: pts };
+  }
+
+  /** 投げた結果のまとめ（飛距離・横のずれ・滞空時間・最高点） */
+  function summarize(d) {
+    if (!d.landing) return null;
+    const L = d.landing.p, s = d.start;
+    const dx = L[0] - s[0], dy = L[1] - s[1];
+    const along = dx * d.dir[0] + dy * d.dir[1];
+    const hlen = Math.hypot(d.dir[0], d.dir[1]) || 1;
+    const sideways = (dx * d.right[0] + dy * d.right[1]);
+    return {
+      distance: Math.hypot(dx, dy),
+      along: along / hlen,
+      sideways,                   // + = 右へずれた
+      hang: d.landing.t,
+      maxZ: d.maxZ,
+    };
+  }
+
+  global.DiscPhysics = {
+    G, RHO, MASS, AREA, DIAM, IZZ, COEF, THROW_TYPES,
+    coefficients, makeThrow, step, simulate, summarize, windAt,
+    setWind: (w) => { WIND = [w[0] || 0, w[1] || 0, 0]; }, getWind: () => WIND.slice(),
+    vec: { dot, cross, len, scale, add, sub, norm },
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* 風（試合・攻撃パート・投げ練習で共通。2026-11-18）
+ *   ・風の強さ speed は「高さ 6m での強さ」[m/秒]。地面に近いほど弱い（低いパスは流されにくく、高いパスほど流される）
+ *     高さごとの割合: 1m 0.45 ／ 2m 0.61 ／ 4m 0.83 ／ 6m 1.0 ／ 10m 1.26（disc_physics.js の windAt）
+ *   ・dir は風が「吹いていく」向き（投げる向き yaw と同じ決め方: 0 = +y（青が攻める向き）、右回りが正）
+ *   ・突風: 数秒ごとに強さが ±25% ほどゆれる（tick を毎コマ呼ぶ）。パスの計算（予想）は基本の強さで行う
+ *   ・見せ方: 四隅の旗（なびく）・画面の矢印と文字・ミニマップの矢印
+ */
+(() => {
+  const P = window.DiscPhysics;
+  const W = { speed: 0, dir: 0, now: 0, t: 0, GUST: 0.25 };
+  const LEVELS = [0, 2, 4, 7];   // なし・弱い・ふつう・強い
+  const LEVEL_NAME = ['なし', '弱い', 'ふつう', '強い'];
+  function apply(sp) { W.now = sp; P.setWind([Math.sin(W.dir) * sp, Math.cos(W.dir) * sp, 0]); }
+  function set(speed, dir) { W.speed = speed; W.dir = dir; W.t = 0; apply(speed); }
+  function tick(dt) {
+    W.t += dt;
+    if (!W.speed) { if (W.now) apply(0); return; }
+    apply(W.speed * (1 + W.GUST * Math.sin(W.t * 0.9) * Math.sin(W.t * 0.37 + 1.3)));
+  }
+  // 点ごとにランダム: なし 15%・弱い 35%・ふつう 30%・強い 20%
+  function randomLevel() { const r = Math.random(); return r < 0.15 ? 0 : r < 0.5 ? 1 : r < 0.8 ? 2 : 3; }
+  const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  // 攻める向き attackYaw に対する呼び方（例: 「向かい風 4m」）
+  function kind(attackYaw = 0) {
+    if (!W.speed) return '風なし';
+    const r = wrap(W.dir - attackYaw), a = Math.abs(r);
+    return a < Math.PI / 4 ? '追い風' : a > Math.PI * 3 / 4 ? '向かい風' : r > 0 ? '左からの横風' : '右からの横風';
+  }
+  const label = (attackYaw = 0) => (W.speed ? `${kind(attackYaw)} ${Math.max(1, Math.round(W.now))}m` : '風なし');
+  // 攻める向きに対して、向かい風の強さ（＋が向かい風）
+  const headwind = (attackYaw = 0) => -W.speed * Math.cos(W.dir - attackYaw);
+
+  // 画面の表示: 矢印（画面の上＝カメラの向いている方）と文字。x, y, s は描く位置と倍率（キャンバスの px）
+  function drawHUD(ctx, x, y, s, camYaw, attackYaw = 0) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(16,24,44,.6)';
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, 150 * s, 40 * s, 10 * s); else ctx.rect(x, y, 150 * s, 40 * s); ctx.fill();
+    const cx = x + 20 * s, cy = y + 20 * s;
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5 * s;
+    ctx.beginPath(); ctx.arc(cx, cy, 14 * s, 0, Math.PI * 2); ctx.stroke();
+    if (W.speed) {
+      const a = W.dir - camYaw, dx = Math.sin(a), dy = -Math.cos(a), L = 11 * s;
+      ctx.strokeStyle = '#7FDBFF'; ctx.fillStyle = '#7FDBFF'; ctx.lineWidth = 3 * s; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx - dx * L, cy - dy * L); ctx.lineTo(cx + dx * L * 0.55, cy + dy * L * 0.55); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + dx * L, cy + dy * L);
+      ctx.lineTo(cx + dx * L * 0.3 - dy * 6 * s, cy + dy * L * 0.3 + dx * 6 * s);
+      ctx.lineTo(cx + dx * L * 0.3 + dy * 6 * s, cy + dy * L * 0.3 - dx * 6 * s); ctx.closePath(); ctx.fill();
+    }
+    ctx.font = `bold ${12 * s}px "Meiryo UI", "Hiragino Sans", sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; ctx.fillText(W.speed ? kind(attackYaw) : '風なし', x + 42 * s, y + 14 * s);
+    ctx.font = `${11 * s}px "Meiryo UI", "Hiragino Sans", sans-serif`; ctx.fillStyle = '#C7CDFD';
+    ctx.fillText(W.speed ? `${Math.max(1, Math.round(W.now))}m/秒（高い所ほど強い）` : '', x + 42 * s, y + 29 * s);
+    ctx.restore();
+  }
+  // ミニマップの矢印（ミニマップは上が +y）
+  function drawMini(ctx, cx, cy, s) {
+    if (!W.speed) return;
+    const dx = Math.sin(W.dir), dy = -Math.cos(W.dir), L = 9 * s;
+    ctx.save(); ctx.strokeStyle = '#7FDBFF'; ctx.fillStyle = '#7FDBFF'; ctx.lineWidth = 2 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - dx * L, cy - dy * L); ctx.lineTo(cx + dx * L * 0.5, cy + dy * L * 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + dx * L, cy + dy * L); ctx.lineTo(cx + dx * L * 0.2 - dy * 4 * s, cy + dy * L * 0.2 + dx * 4 * s); ctx.lineTo(cx + dx * L * 0.2 + dy * 4 * s, cy + dy * L * 0.2 - dx * 4 * s); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  // 四隅の旗（高さ 2.6m のポールに、風下へなびく旗）。toCam・proj・NEAR は各モードの投影
+  const FLAGS = [[-1.2, -1.2], [38.2, -1.2], [-1.2, 101.2], [38.2, 101.2]];
+  function drawFlag(ctx, base, toCam, proj, NEAR, dpr) {
+    const H = 2.6, k = Math.min(1, W.now / 5), ph = base[0] * 0.7 + base[1] * 0.13;
+    const dx = Math.sin(W.dir), dy = Math.cos(W.dir), L = 0.95;
+    const flut = 0.1 * k * Math.sin(W.t * 9 + ph);
+    const top = [base[0], base[1], H], mid = [base[0], base[1], H - 0.5];
+    // なびき具合: 風が弱いと垂れ下がり、強いと横へ伸びる
+    const tip = [base[0] + dx * L * (0.25 + 0.75 * k) - dy * flut, base[1] + dy * L * (0.25 + 0.75 * k) + dx * flut, H - 0.25 - 0.55 * (1 - k)];
+    const c0 = toCam([base[0], base[1], 0]), c1 = toCam(top), c2 = toCam(mid), c3 = toCam(tip);
+    if (c0[2] < NEAR || c1[2] < NEAR || c2[2] < NEAR || c3[2] < NEAR) return;
+    const p0 = proj(c0), p1 = proj(c1), p2 = proj(c2), p3 = proj(c3);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(240,240,240,.95)'; ctx.lineWidth = Math.max(1, 1.6 * dpr);
+    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
+    ctx.fillStyle = '#FF6699'; ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p2[0], p2[1]); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  window.WIND = { state: W, LEVELS, LEVEL_NAME, set, tick, randomLevel, kind, label, headwind, drawHUD, drawMini, drawFlag, FLAGS };
+})();
+
+</script>
+<script>
+/* 音と声（試合・攻撃パート・投げ練習で共通。2026-11-19）
+ *   効果音は音のファイルを使わず、ブラウザの Web Audio でその場で作る（ノイズ＋フィルター、正弦波など）
+ *   声はスマホの読み上げ機能（speechSynthesis）。ストールは「ストーリング、ワン、ツー…」
+ *   設定（端末に保存 'ufps_settings'）: sfx = 'big'（大）/ 'small'（小）/ 'off'（なし）、voice = 'on' / 'off'。最初は 大・あり
+ *   iPhone はマナーモードのとき効果音が鳴らないことがある（iPhone の決まり）
+ *   最初に画面に触れたときに音を使えるようにする（スマホは、触る前は音を出せない）
+ *   鳴らしたきっかけは SND.log に残す（確認用。最新 200 件）
+ */
+(() => {
+  const KEY = 'ufps_settings';
+  const S = { ctx: null, master: null, noiseBuf: null, sfx: 'big', voice: 'on', log: [], hum: null, wind: null, heli: null, lastSpeak: '' };
+  try { const st = JSON.parse(localStorage.getItem(KEY) || '{}'); if (['big', 'small', 'off'].includes(st.sfx)) S.sfx = st.sfx; if (['on', 'off'].includes(st.voice)) S.voice = st.voice; } catch (e) { /* 既定のまま */ }
+  const VOL = { big: 0.9, small: 0.35, off: 0 };
+  function save() { try { const st = JSON.parse(localStorage.getItem(KEY) || '{}'); st.sfx = S.sfx; st.voice = S.voice; localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* 保存できない環境 */ } }
+  function note(name) { S.log.push({ name, t: performance.now() }); if (S.log.length > 200) S.log.shift(); }
+
+  // 音を使えるようにする（最初のタップで）
+  function init() {
+    if (S.ctx) { if (S.ctx.state === 'suspended') S.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      S.ctx = new AC();
+      S.master = S.ctx.createGain(); S.master.gain.value = VOL[S.sfx]; S.master.connect(S.ctx.destination);
+      const n = S.ctx.sampleRate * 2, b = S.ctx.createBuffer(1, n, S.ctx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      S.noiseBuf = b;
+      if (window.speechSynthesis && S.voice === 'on') { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }   // 読み上げも使えるように
+    } catch (e) { S.ctx = null; }
+  }
+  addEventListener('pointerdown', init, { capture: true });
+  addEventListener('keydown', init, { capture: true });
+  const ok = () => S.ctx && S.sfx !== 'off' && S.ctx.state !== 'closed';
+
+  // 部品: ノイズ（フィルターつき）と、音程のある音
+  function noise({ dur = 0.2, type = 'bandpass', f0 = 1000, f1 = null, q = 1, gain = 0.5, attack = 0.005, at = 0 }) {
+    const c = S.ctx, t = c.currentTime + at, src = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = S.noiseBuf; src.loop = true; fl.type = type; fl.Q.value = q;
+    fl.frequency.setValueAtTime(f0, t); if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(fl); fl.connect(g); g.connect(S.master); src.start(t, Math.random()); src.stop(t + dur + 0.05);
+  }
+  function tone({ dur = 0.15, type = 'sine', f0 = 440, f1 = null, gain = 0.3, attack = 0.005, at = 0 }) {
+    const c = S.ctx, t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(S.master); o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  // 効果音
+  const FX = {
+    throw(p = 0.6) { noise({ dur: 0.16 + 0.08 * p, f0: 700, f1: 1800 + 1800 * p, q: 1.2, gain: 0.25 + 0.35 * p, attack: 0.02 }); },
+    catch() { noise({ dur: 0.05, type: 'highpass', f0: 2200, gain: 0.55 }); tone({ dur: 0.07, f0: 1100, f1: 700, gain: 0.25 }); },
+    land() { tone({ dur: 0.12, f0: 140, f1: 60, gain: 0.45 }); noise({ dur: 0.35, type: 'lowpass', f0: 900, f1: 300, gain: 0.12, attack: 0.03, at: 0.03 }); },
+    block() { noise({ dur: 0.07, f0: 1600, q: 2, gain: 0.8 }); tone({ dur: 0.1, type: 'triangle', f0: 420, f1: 200, gain: 0.35 }); },
+    slide() { noise({ dur: 0.4, type: 'lowpass', f0: 1400, f1: 250, gain: 0.35, attack: 0.02 }); },
+    jump() { noise({ dur: 0.12, type: 'lowpass', f0: 700, f1: 300, gain: 0.25, attack: 0.02 }); },
+    chime() { tone({ dur: 0.25, f0: 1320, gain: 0.18 }); tone({ dur: 0.35, f0: 1760, gain: 0.16, at: 0.07 }); tone({ dur: 0.45, f0: 2640, gain: 0.08, at: 0.12 }); },
+    tick() { noise({ dur: 0.025, type: 'highpass', f0: 3000, gain: 0.15 }); },
+    turnover() { tone({ dur: 0.18, type: 'square', f0: 120, f1: 90, gain: 0.18 }); },
+    lose() { tone({ dur: 0.3, type: 'triangle', f0: 392, gain: 0.25 }); tone({ dur: 0.5, type: 'triangle', f0: 294, gain: 0.25, at: 0.28 }); },
+    fanfare() { [523, 659, 784, 1047].forEach((f, i) => tone({ dur: i === 3 ? 0.5 : 0.14, type: 'square', f0: f, gain: 0.12, at: i * 0.12 })); },
+    cheer(big = 1) {   // 歓声: 帯域を絞ったノイズを、ざわざわと揺らしながら重ねる
+      const dur = 1.0 + 0.8 * big;
+      for (let k = 0; k < 4; k++) noise({ dur: dur * (0.7 + 0.3 * Math.random()), f0: 700 + k * 350, q: 0.8, gain: (0.12 + 0.06 * big) * (0.7 + 0.3 * Math.random()), attack: 0.15, at: k * 0.05 });
+    },
+    whistle() { tone({ dur: 0.35, f0: 2900, gain: 0.12 }); },
+  };
+  function play(name, arg) { note(name); if (!ok() || !FX[name]) return; try { FX[name](arg); } catch (e) { /* 鳴らせなくても試合は続ける */ } }
+
+  // 続けて鳴る音: ディスクの回転（フーン）・ヘリコプター・風
+  function loopNode(type, f, q) {
+    const c = S.ctx, src = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = S.noiseBuf; src.loop = true; fl.type = type; fl.frequency.value = f; fl.Q.value = q; g.gain.value = 0;
+    src.connect(fl); fl.connect(g); g.connect(S.master); src.start();
+    return { src, fl, g };
+  }
+  // ディスクが飛んでいる間の音。dist: カメラからの距離 [m]、speed: 速さ [m/秒]。dist に null を渡すと止める
+  function hum(dist, speed, heli = false) {
+    if (!ok()) return;
+    if (!S.hum) S.hum = loopNode('bandpass', 380, 3);
+    const v = dist == null ? 0 : clampN(0.25 * Math.min(1, speed / 25) * Math.min(1, 6 / Math.max(1, dist)), 0, 0.3);
+    S.hum.g.gain.setTargetAtTime(v, S.ctx.currentTime, 0.05);
+    S.hum.fl.frequency.setTargetAtTime(250 + 12 * (speed || 0), S.ctx.currentTime, 0.1);
+    if (!S.heli) S.heli = loopNode('bandpass', 160, 2);
+    const hv = dist != null && heli ? clampN(0.3 * Math.min(1, 8 / Math.max(1, dist)), 0, 0.3) * (0.6 + 0.4 * Math.sin(S.ctx.currentTime * 40)) : 0;   // ブーンと回る
+    S.heli.g.gain.setTargetAtTime(hv, S.ctx.currentTime, 0.02);
+  }
+  // 風の音。speed: 風の強さ [m/秒]（0 で止める）
+  function wind(speed) {
+    if (!ok()) return;
+    if (!S.wind) S.wind = loopNode('lowpass', 420, 0.7);
+    const v = speed > 0.3 ? clampN(0.04 + 0.025 * speed, 0, 0.25) * (0.8 + 0.2 * Math.sin(S.ctx.currentTime * 0.7)) : 0;
+    S.wind.g.gain.setTargetAtTime(v, S.ctx.currentTime, 0.3);
+  }
+  const clampN = (x, a, b) => Math.max(a, Math.min(b, x));
+
+  // 声（読み上げ）
+  function speak(text, rate = 1.15) {
+    note('声: ' + text);
+    if (S.voice !== 'on' || !window.speechSynthesis) return;
+    try {
+      speechSynthesis.cancel();   // 前の読み上げは止める（ストールの数がずれないように）
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP'; u.rate = rate; u.volume = 1;
+      speechSynthesis.speak(u);
+    } catch (e) { /* 読み上げできない環境 */ }
+  }
+  const STALL_WORD = ['ワン', 'ツー', 'スリー', 'フォー', 'ファイブ', 'シックス', 'セブン', 'エイト', 'ナイン', 'テン'];
+  function stall(n) { if (n < 1 || n > 10) return; speak(n === 1 ? 'ストーリング、ワン' : STALL_WORD[n - 1], 1.25); }
+
+  // 設定
+  function setSfx(v) { S.sfx = v; if (S.master) S.master.gain.value = VOL[v]; if (v === 'off') { hum(null, 0); wind(0); } save(); }
+  function setVoice(v) { S.voice = v; if (v === 'off' && window.speechSynthesis) speechSynthesis.cancel(); save(); }
+  const SFX_NAME = { big: '大', small: '小', off: 'なし' };
+  const nextSfx = () => setSfx({ big: 'small', small: 'off', off: 'big' }[S.sfx]);
+  const toggleVoice = () => setVoice(S.voice === 'on' ? 'off' : 'on');
+  window.SND = { init, play, hum, wind, speak, stall, setSfx, setVoice, nextSfx, toggleVoice, state: S, SFX_NAME, get log() { return S.log; } };
+})();
+
+</script>
+<script>
+/* ============================================================
+ * discdraw.js ― ディスクの描き方（練習モード・攻撃パート・試合版で共通）
+ *
+ * なぜ: 以前は「白い平らな円＋細い線」で、厚みがなく、遠いと点になって見失いやすかった。
+ *   - 厚み（縁の高さ 3.2cm）のある立体として描く。上面・縁・裏面で色を変え、どちら向きか分かるようにする
+ *   - 上面に模様（青い二重の輪と、回転と一緒に回る帯）を入れて、回転が見えるようにする
+ *   - 影は高さで大きさと濃さを変える（低いほど小さく濃い）→ どこに落ちてくるか読める
+ *   - 飛んでいる間は、うしろに薄い軌跡を残す → 曲がり方が見える
+ *   - 遠くて小さいときは、最低の大きさと白い光の輪で見失わないようにする
+ *   - 画面の外にあるときは、画面の端に矢印を出す
+ *   - 遠くにあるときだけ少し大きめに描く（15mより先で徐々に、55m以上で1.6倍）。ゲームとして見やすくするため
+ *   - 一人称の攻撃では、持っているディスクを画面の下に見せる（ピボットの向き・傾きで持ち方が変わる）
+ * ============================================================ */
+(function (global) {
+  'use strict';
+  const R = 0.137, RIM = 0.032;   // 半径・縁の高さ [m]（実物の公式ディスク 27.4cm）
+  const SEG = 28;
+
+  /**
+   * env: ctx, toCam(p), proj(c), NEAR, V（ベクトル計算）, getCam() → {e,f,r,u}, getFocal(), getDPR(), getW(), getH()
+   */
+  function create(env) {
+    const { ctx, toCam, proj, NEAR, V } = env;
+    const trails = new WeakMap();
+
+    function basis(n) {
+      let e1 = V.cross(n, [0, 0, 1]);
+      if (V.len(e1) < 1e-3) e1 = [1, 0, 0];
+      e1 = V.norm(e1);
+      return [e1, V.cross(n, e1)];
+    }
+    function polyScreen(world, fill, stroke, lw) {
+      const cs = world.map(toCam);
+      if (cs.some((c) => c[2] < NEAR)) return false;
+      ctx.beginPath();
+      cs.forEach((c, i) => { const s = proj(c); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+      return true;
+    }
+    // 遠くにあるときだけ少し大きめに
+    const scaleAt = (dist) => 1 + Math.max(0, Math.min(1, (dist - 15) / 40)) * 0.6;
+    function ring(c, e1, e2, rad, off) {
+      const pts = [];
+      for (let i = 0; i < SEG; i++) {
+        const a = i / SEG * Math.PI * 2 + (off || 0);
+        pts.push(V.add(c, V.add(V.scale(e1, Math.cos(a) * rad), V.scale(e2, Math.sin(a) * rad))));
+      }
+      return pts;
+    }
+
+    // 飛んでいる間の軌跡（直近の位置を覚えて、薄い線で描く）
+    function trail(d) {
+      let t = trails.get(d);
+      if (!t) { t = []; trails.set(d, t); }
+      if (d.phase === 'flight') {
+        const last = t[t.length - 1];
+        if (!last || Math.hypot(last[0] - d.p[0], last[1] - d.p[1], last[2] - d.p[2]) > 0.25) t.push(d.p.slice());
+        if (t.length > (d.sp && d.sp !== 'bad' ? 44 : 26)) t.shift();   // 特殊スローは長め
+      } else if (t.length) t.shift();
+      if (t.length < 2) return;
+      const DPR = env.getDPR();
+      const sp = d.sp && d.sp !== 'bad';   // 特殊スロー: 金色に光る、長めの軌跡（2026-11-19）
+      ctx.lineCap = 'round';
+      if (sp) { ctx.shadowColor = 'rgba(255,200,60,0.9)'; ctx.shadowBlur = 10 * DPR; }
+      for (let i = 1; i < t.length; i++) {
+        const a = toCam(t[i - 1]), b = toCam(t[i]);
+        if (a[2] < NEAR || b[2] < NEAR) continue;
+        const sa = proj(a), sb = proj(b);
+        ctx.strokeStyle = sp ? `rgba(255,214,90,${(0.85 * i / t.length).toFixed(3)})` : `rgba(255,255,255,${(0.55 * i / t.length).toFixed(3)})`;
+        ctx.lineWidth = Math.max((sp ? 2.5 : 1.5) * DPR, (sp ? 0.08 : 0.05) * env.getFocal() / b[2]) * (0.4 + 0.6 * i / t.length);
+        ctx.beginPath(); ctx.moveTo(sa[0], sa[1]); ctx.lineTo(sb[0], sb[1]); ctx.stroke();
+      }
+      if (sp) { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; }
+      ctx.lineCap = 'butt';
+    }
+
+    // 影: 高さで大きさと濃さを変える
+    function drawShadow(d) {
+      const z = d.p[2];
+      if (z < 0.02) return;
+      const k = Math.exp(-z / 7);
+      const rad = R * (1.15 + z * 0.06);
+      const pts = [];
+      for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; pts.push([d.p[0] + Math.cos(a) * rad, d.p[1] + Math.sin(a) * rad, 0.004]); }
+      polyScreen(pts, `rgba(0,0,0,${(0.16 + 0.26 * k).toFixed(3)})`);
+    }
+
+    function drawDisc(d) {
+      trail(d);
+      const c = toCam(d.p);
+      if (c[2] < NEAR) return;
+      const focal = env.getFocal(), DPR = env.getDPR();
+      const k = scaleAt(c[2]), Rk = R * k, RIMk = RIM * k;
+      const sc = proj(c), pxR = Rk * focal / c[2];
+      // 遠くて小さいとき: 最低の大きさ＋白い光の輪
+      if (pxR < 4 * DPR) {
+        ctx.fillStyle = 'rgba(255,255,255,.35)';
+        ctx.beginPath(); ctx.arc(sc[0], sc[1], 9 * DPR, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 1.5 * DPR;
+        ctx.beginPath(); ctx.arc(sc[0], sc[1], 4 * DPR, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        return;
+      }
+      const cam = env.getCam();
+      const n = d.n, [e1, e2] = basis(n);
+      const top = V.add(d.p, V.scale(n, RIMk / 2)), bot = V.add(d.p, V.scale(n, -RIMk / 2));
+      const toEye = V.sub(cam.e, d.p);
+      const seeTop = V.dot(toEye, n) > 0;
+      const rTop = ring(top, e1, e2, Rk), rBot = ring(bot, e1, e2, Rk * 0.97);
+      const lw = Math.max(1, Math.min(2.2 * DPR, pxR * 0.06));
+      // 縁（カメラに向いている側だけ）
+      for (let i = 0; i < SEG; i++) {
+        const j = (i + 1) % SEG, am = (i + 0.5) / SEG * Math.PI * 2;
+        const out = V.add(V.scale(e1, Math.cos(am)), V.scale(e2, Math.sin(am)));
+        if (V.dot(out, toEye) <= 0) continue;
+        const shade = 200 + Math.round(40 * Math.max(0, V.dot(out, [0.3, -0.3, 0.9])));   // 上から光が当たっている感じ
+        polyScreen([rTop[i], rTop[j], rBot[j], rBot[i]], `rgb(${shade},${shade + 3},${shade + 8})`);
+      }
+      // 見えている面
+      const faceRing = seeTop ? rTop : rBot, center = seeTop ? top : bot;
+      polyScreen(faceRing, seeTop ? '#fbfbfb' : '#cdd3dc', '#5b6472', lw);
+      if (seeTop) {
+        // 模様: 青い二重の輪と、回転と一緒に回る帯
+        polyScreen(ring(center, e1, e2, Rk * 0.78), null, '#7889FB', Math.max(1, pxR * 0.07));
+        polyScreen(ring(center, e1, e2, Rk * 0.6), null, 'rgba(120,137,251,.6)', Math.max(1, pxR * 0.04));
+        const a = d.spinAngle || 0;
+        const m1 = V.add(V.scale(e1, Math.cos(a)), V.scale(e2, Math.sin(a)));
+        const m2 = V.add(V.scale(e1, -Math.sin(a)), V.scale(e2, Math.cos(a)));
+        const band = [
+          V.add(center, V.add(V.scale(m1, Rk * 0.5), V.scale(m2, Rk * 0.09))),
+          V.add(center, V.add(V.scale(m1, Rk * 0.5), V.scale(m2, -Rk * 0.09))),
+          V.add(center, V.add(V.scale(m1, -Rk * 0.5), V.scale(m2, -Rk * 0.09))),
+          V.add(center, V.add(V.scale(m1, -Rk * 0.5), V.scale(m2, Rk * 0.09))),
+        ];
+        polyScreen(band, '#FF6699');
+      } else {
+        // 裏面: 縁の内側の段差
+        polyScreen(ring(center, e1, e2, Rk * 0.86), null, 'rgba(90,100,115,.7)', Math.max(1, pxR * 0.05));
+      }
+    }
+
+    // 画面の外にあるとき、画面の端に矢印を出す
+    function drawOffscreen(d) {
+      if (!d || d.phase !== 'flight') return;
+      const W = env.getW(), H = env.getH(), DPR = env.getDPR();
+      const c = toCam(d.p);
+      let sx, sy;
+      if (c[2] > NEAR) { const s = proj(c); sx = s[0]; sy = s[1]; if (sx > 0 && sx < W && sy > 0 && sy < H) return; }
+      else { sx = W / 2 - c[0] * 1000; sy = H / 2 + c[1] * 1000; }   // 後ろにあるときは向きだけ
+      const cx = W / 2, cy = H / 2, dx = sx - cx, dy = sy - cy;
+      const k = Math.min((W / 2 - 30 * DPR) / Math.abs(dx || 1e-6), (H / 2 - 30 * DPR) / Math.abs(dy || 1e-6));
+      const x = cx + dx * k, y = cy + dy * k, ang = Math.atan2(dy, dx);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+      ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.strokeStyle = 'rgba(16,24,44,.8)'; ctx.lineWidth = 2 * DPR;
+      ctx.beginPath(); ctx.moveTo(14 * DPR, 0); ctx.lineTo(-8 * DPR, 9 * DPR); ctx.lineTo(-8 * DPR, -9 * DPR); ctx.closePath();
+      ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+
+    // 一人称で持っているディスク: カメラから見た位置に置いて描く
+    //   type: 'backhand' | 'forehand' | 'hammer', hand: 'R' | 'L', rollDeg: 表面が右へ傾いている角度
+    function drawHeld(type, hand, rollDeg) {
+      const cam = env.getCam();
+      const mir = hand === 'L' ? -1 : 1;
+      let x, y, z;
+      if (type === 'backhand') { x = -0.3 * mir; y = -0.42; z = 0.85; }        // 体の前を横切って逆側に引いている
+      else if (type === 'hammer') { x = 0.34 * mir; y = 0.0; z = 0.8; }       // 頭の横に立てて持つ
+      else if (type === 'heli') { x = 0.34 * mir; y = 0.0; z = 0.8; }        // ヘリコプター: 頭の横（ハンマーと同じ）
+      else if (type === 'scoober') { x = -0.36 * mir; y = -0.08; z = 0.7; }   // 逆側の頬の横に立てて持つ（手の甲が頬）
+      else if (type === 'highfore') { x = 0.4 * mir; y = -0.12; z = 0.8; }   // 利き手側の頭の横
+      else { x = 0.38 * mir; y = -0.44; z = 0.85; }                                // 利き手側の腰の横
+      const p = V.add(cam.e, V.add(V.scale(cam.r, x), V.add(V.scale(cam.u, y), V.scale(cam.f, z))));
+      const tilt = 32 * Math.PI / 180;   // 表面が少しこちらを向くように
+      let n = V.norm(V.add(V.scale(cam.u, Math.cos(tilt)), V.scale(cam.f, -Math.sin(tilt))));
+      const rr = (type === 'scoober' ? 180 : rollDeg) * Math.PI / 180;   // スクーバは構えから裏返し（表面が下）
+      n = V.norm(V.add(V.scale(n, Math.cos(rr)), V.scale(cam.r, Math.sin(rr))));
+      drawDisc({ p, n, spinAngle: 0.6, phase: 'held' });
+    }
+
+    return { drawDisc, drawShadow, drawOffscreen, drawHeld };
+  }
+
+  global.DiscDraw = { create };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ピボットのパッド（試合・攻撃パート・投げ練習で共通。2026-11-18 スライド → 2026-11-18 縦にも動かせるパッドに）
+ *   横 a（-1〜+1）: 踏み出す足の向き。足を置ける場所は「体のうしろ側の半円」
+ *     a = -1: 左真横（0.8m） … a = 0: 真後ろ（0.6m） … a = +1: 右真横（0.8m）
+ *   縦 b（0〜1）: ディスクを離す高さ。0 = いちばん低い（しゃがむ）、0.5 = ふつうに立つ、上の段（0.67 より上）= 高い投げ方
+ *   区間（右利き。左利きは左右の投げ方が入れかわる）:
+ *     上の段: 左 = スクーバ（コード LT）／真ん中 = ハンマー（B）／右 = ハイフォア（RT）
+ *     中〜下: 左半分 = バックハンド（L）／右半分 = フォアハンド（R）
+ *   境目でちらつかないよう「のりしろ」（横 0.06、縦 0.05）
+ *   足と高さは指より 0.15秒ほど遅れてついてくる（自然に見える。すばやく動かせばフェイクにもなる）
+ *   下へ動かすほど姿勢が低くなる（目の高さが最大 0.32m 下がる。真ん中より上は立ったまま）
+ */
+(() => {
+  const ZB = 0.33, HY = 0.06, TOP = 0.67, HB = 0.05, LAG = 0.15, DROP = 0.32;
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const th = (a) => a * Math.PI / 2;
+  // 体から見た足の位置 [横（右が+）, 前（前が+）] m
+  function off(a) { const t = th(a), s = Math.sin(t), R = 0.6 + 0.2 * Math.abs(s); return [s * R, -Math.cos(t) * R]; }
+  function foot(p, yaw, a) {
+    const [lat, fw] = off(a), r = [Math.cos(yaw), -Math.sin(yaw)], f = [Math.sin(yaw), Math.cos(yaw)];
+    return [p[0] + r[0] * lat + f[0] * fw, p[1] + r[1] * lat + f[1] * fw];
+  }
+  const isTop = (z) => z === 'LT' || z === 'B' || z === 'RT';
+  //   縦3段: 上（b > 0.67）・中（0.33〜0.67）・下（0.33 以下）。特殊スローを持つ選手だけ、中・下の左右と真ん中・中に専用の区間がある
+  //   sk: その選手の特殊な区間（例 { LM: 'シャープカーブ', RD: 'エアバウンド', C: 'ヘリコプター' }）。無ければ前と同じ（中〜下は左右2つ）
+  const MID = 0.33;
+  function codeAt(a, b, sk) {
+    if (b > TOP) { const t = a < -ZB ? 'LT' : a > ZB ? 'RT' : 'B'; if (!(sk && sk.merge && sk.merge.includes(t))) return t; }   // merge: 区切らない上の段（下の区間とひと続き）
+    const row = b > MID ? 'M' : 'D';
+    if (row === 'M' && sk && sk.C && Math.abs(a) < ZB) return 'C';
+    const side = a < 0 ? 'L' : 'R';
+    return sk && sk[side + row] ? side + row : side;
+  }
+  function zone(a, b, prev, sk) {
+    const z = codeAt(a, b, sk);
+    if (!prev || z === prev) return z;
+    // 境目の近く（横 0.06・縦 0.05 以内）に前の区間があれば、前の投げ方のまま（ちらつかないように）
+    for (const da of [-HY, 0, HY]) for (const db of [-HB, 0, HB]) if (codeAt(clamp(a + da, -1, 1), clamp(b + db, 0, 1), sk) === prev) return prev;
+    return z;
+  }
+  const CENTER = { L: [-1, 0.5], R: [1, 0.5], B: [0, 0.85], LT: [-1, 0.85], RT: [1, 0.85], LM: [-0.75, 0.5], RM: [0.75, 0.5], LD: [-0.75, 0.15], RD: [0.75, 0.15], C: [0, 0.5] };
+  const center = (z) => (CENTER[z] || CENTER.R)[0];
+  const centerB = (z) => (CENTER[z] || CENTER.R)[1];
+  const drop = (b) => DROP * Math.pow(clamp(1 - b / 0.5, 0, 1), 1.3);
+  const follow = (cur, tgt, dt) => cur + (tgt - cur) * (1 - Math.exp(-dt / LAG));
+  // 画面の四角（box: x, y, w, h）とパッドの位置の変換
+  const padX = (b) => Math.min(b.h, 56) * 0.42, padY = (b) => 10;
+  const xOf = (a, b) => b.x + padX(b) + (a + 1) / 2 * (b.w - 2 * padX(b));
+  const yOf = (v, b) => b.y + padY(b) + (1 - v) * (b.h - 2 * padY(b));
+  const fromX = (x, b) => clamp(((x - b.x - padX(b)) / (b.w - 2 * padX(b))) * 2 - 1, -1, 1);
+  const fromY = (y, b) => clamp(1 - (y - b.y - padY(b)) / (b.h - 2 * padY(b)), 0, 1);
+  const fromXY = (x, y, b) => [fromX(x, b), fromY(y, b)];
+  const hit = (x, y, b) => !!b && x >= b.x - 10 && x <= b.x + b.w + 10 && y >= b.y - 14 && y <= b.y + b.h + 10;
+  // 描く。s: 四角の単位 → キャンバスの px の倍率。st: { a, b, tgt, tgtB, zone, labels: {L, R, LT, B, RT}, caption }
+  function draw(ctx, bx, s, st) {
+    const X = (v) => v * s, font = (px, bold) => `${bold ? 'bold ' : ''}${px * s}px "Meiryo UI", "Hiragino Sans", sans-serif`;
+    const rr = (x, y, w, h, r) => { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); };
+    ctx.save();
+    ctx.fillStyle = 'rgba(16,24,44,.62)'; rr(X(bx.x), X(bx.y), X(bx.w), X(bx.h), X(12)); ctx.fill();
+    const yT = yOf(TOP, bx), xa = xOf(-ZB, bx), xb = xOf(ZB, bx), xm = xOf(0, bx), x1 = bx.x + bx.w, y1 = bx.y + bx.h;
+    // 区間: 上の段は3つ、中〜下は左右2つ
+    const yM = yOf(MID, bx);
+    const cells = {
+      LT: [bx.x, bx.y, xa, yT], B: [xa, bx.y, xb, yT], RT: [xb, bx.y, x1, yT],
+      L: [bx.x, yT, xm, y1], R: [xm, yT, x1, y1],
+      LM: [bx.x, yT, xm, yM], LD: [bx.x, yM, xm, y1], RM: [xm, yT, x1, yM], RD: [xm, yM, x1, y1], C: [xa, yT, xb, yM],
+    };
+    const sk = st.special || {};   // 特殊な区間（名前）。上の段の LT・RT が特殊なら、そこも桃色にする
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const mgs = sk.merge || [];   // 区切らない上の段（'LT'・'RT' のうち、その選手が持っていない側）
+    for (const mg of mgs) { const side = mg[0];
+      cells[side] = side === 'L' ? [bx.x, bx.y, xm, y1] : [xm, bx.y, x1, y1];   // 下の区間を上の段まで伸ばす（描くのは L 字）
+      cells[side + 'M'] = side === 'L' ? [bx.x, bx.y, xm, yM] : [xm, bx.y, x1, yM]; }
+    const order = ['LT', 'B', 'RT', 'L', 'R', ...['LM', 'LD', 'RM', 'RD', 'C'].filter((z) => sk[z])].filter((z) => !mgs.includes(z));
+    for (const z of order) {
+      const [l, t, r, b] = cells[z], on = z === st.zone, spc = !!sk[z];
+      const side = z[0], lshape = mgs.includes(side + 'T') && (z === side || z === side + 'M') && t < yT;   // L 字（上の段はハンマーの列を除く）
+      const box = (x, y, w, h, r2) => { if (!lshape) { rr(x, y, w, h, r2); return; } const cut = side === 'L' ? X(xa) : X(xb); ctx.beginPath();
+        if (side === 'R') { ctx.moveTo(cut, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, X(yT)); ctx.lineTo(cut, X(yT)); }
+        else { ctx.moveTo(x, y); ctx.lineTo(cut, y); ctx.lineTo(cut, X(yT)); ctx.lineTo(x + w, X(yT)); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); }
+        ctx.closePath(); };
+      if (spc) { ctx.fillStyle = 'rgba(255,102,153,.22)'; box(X(l + 2), X(t + 2), X(r - l - 4), X(b - t - 4), X(7)); ctx.fill(); ctx.strokeStyle = 'rgba(255,102,153,.9)'; ctx.lineWidth = X(1.5); ctx.stroke(); }
+      if (on) { ctx.fillStyle = spc ? 'rgba(255,102,153,.7)' : 'rgba(120,137,251,.55)'; box(X(l + 3), X(t + 3), X(r - l - 6), X(b - t - 6), X(8)); ctx.fill(); }
+      ctx.font = font(isTop(z) || spc ? 10 : 11, on || spc); ctx.fillStyle = on ? '#fff' : spc ? '#FFC2D6' : '#c5cbe0';
+      let lb = spc ? '★' + sk[z] : (st.labels[z] || '');
+      if (ctx.measureText(lb).width > X(r - l - 6)) lb = lb.replace('ハンド', '').replace('カーブ', '');   // 狭いときは短く
+      const lowCell = z === 'L' || z === 'R';
+      const lx = lshape ? (side === 'R' ? (xm + x1) / 2 + (x1 - xm) * 0.1 : (bx.x + xm) / 2 - (xm - bx.x) * 0.1) : (l + r) / 2;
+      ctx.fillText(lb, X(lx), X(lshape ? (z.length === 2 ? (yT + yM) / 2 : yT + 14) : lowCell ? t + 14 : (t + b) / 2));
+    }
+    // 区切りの線と「低く」の目印（区切らない側の、上の段と下の段の間の線は引かない）
+    ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = X(1.5);
+    ctx.beginPath(); ctx.moveTo(X(mgs.includes('LT') ? xa : bx.x + 6), X(yT)); ctx.lineTo(X(mgs.includes('RT') ? xb : x1 - 6), X(yT));
+    ctx.moveTo(X(xa), X(bx.y + 6)); ctx.lineTo(X(xa), X(yT)); ctx.moveTo(X(xb), X(bx.y + 6)); ctx.lineTo(X(xb), X(yT));
+    ctx.moveTo(X(xm), X(yT)); ctx.lineTo(X(xm), X(y1 - 6)); ctx.stroke();
+    ctx.font = font(9, false); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillText('↓ 低く', X(xm), X(y1 - 7));
+    // 指の位置（うすい輪）と、実際の足と高さ（つまみ。姿勢が低いほど黄色→桃色）
+    const tx = xOf(st.tgt, bx), ty = yOf(st.tgtB ?? 0.5, bx), kx = xOf(st.a, bx), ky = yOf(st.b ?? 0.5, bx);
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = X(2);
+    ctx.beginPath(); ctx.arc(X(tx), X(ty), X(11), 0, Math.PI * 2); ctx.stroke();
+    const low = drop(st.b ?? 0.5) / DROP;
+    ctx.fillStyle = low > 0.6 ? '#FF6699' : '#FFE650';
+    ctx.beginPath(); ctx.arc(X(kx), X(ky), X(8), 0, Math.PI * 2); ctx.fill();
+    if (st.caption) { ctx.font = font(10, false); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.textBaseline = 'alphabetic'; ctx.fillText(st.caption, X(bx.x + bx.w / 2), X(bx.y - 5)); }
+    ctx.restore();
+  }
+  window.PIV = { codeAt, MID, off, foot, zone, isTop, center, centerB, drop, follow, fromX, fromY, fromXY, xOf, yOf, hit, draw, TOP };
+})();
+
+</script>
+<script>
+/* ============================================================
+ * practice.js ― 投げ練習モード（描画・操作）v2: スマホとPCの両方に対応
+ *   物理は disc_physics.js（DiscPhysics）に任せ、ここは「見せる」「操作する」だけ。
+ *   3D表示は外部ライブラリを使わず、canvas 2D に遠近法で投影して描く。
+ *
+ *   操作の考え方（企画メモ v4 の7章）
+ *   - ピボットを踏む向き＝投げ方（右利き: 左=バック、後ろ=ハンマー、右=フォア）
+ *   - おまかせパス: 味方をタップ（PCは照準を合わせて短くクリック）
+ *   - 自分で投げる: スマホはディスクからフリック、PCは長押しでためて離す
+ * ============================================================ */
+(function () {
+  'use strict';
+  const P = DiscPhysics, V = P.vec;
+  const DEG = Math.PI / 180;
+  const FIELD = { W: 37, L: 100, EZ: 18 };
+  const EYE_H = 1.65;                 // 目の高さ [m]
+  const SPEED_MIN = 8, SPEED_MAX = 33; // 初速の範囲 [m/s]
+  const CHARGE_TIME = 1.0;            // PC: 最大までためる時間 [s]
+  const QUICK_CLICK = 0.2;            // PC: これより短いクリックは「おまかせパス」[s]
+  const DISC_R = 0.137;               // 描画用の半径 [m]
+  const CATCH_Z = 1.2;                // 照準補正・おまかせパスで狙う高さ（胸）[m]
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+  // スマホ・タブレットかどうか（タッチ操作の画面にする）
+  let IS_TOUCH = ('ontouchstart' in window) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
+  if (IS_TOUCH) document.body.classList.add('touch');
+
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1, focal = 1, UI = 1;
+  const FOV = 72 * DEG;
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.width = Math.floor(innerWidth * DPR);
+    H = cv.height = Math.floor(innerHeight * DPR);
+    focal = (H / 2) / Math.tan(FOV / 2);
+    // HUD の倍率: 幅1400px・高さ820px以上で等倍。スマホでは最小0.5倍まで縮める
+    // スマホは画面が小さくても文字が読めるよう、最小0.75倍で止める
+    UI = DPR * Math.max(IS_TOUCH ? 0.75 : 0.6, Math.min(1, innerWidth / 1400, innerHeight / 820));
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // ---------------- 状態 ----------------
+  const S = {
+    started: false, time: 0,
+    foot: [18.5, FIELD.EZ], pivot: 'L', yaw: 0, pitch: -1 * DEG,
+    nose: 3, hyzer: 0, hand: 'R',
+    charging: false, chargeT: 0, power: 0, lastPower: 0.5,
+    discs: [], lastRec: null,
+    camMode: 0, slow: false, help: true,
+    assistNose: true, assistAim: true, predict: true,      // 補助（最初はすべてオン）
+    gyro: false, gyroInvert: false, matesMove: true,
+    wrist: 12,                // 手首のクセ（自然なアンハイザー）[deg]。右利きならバックは右、フォアは左へ曲がる
+    pred: null, aim: null, cur: null, calcKey: '', calcAt: 0,
+    aimMate: null, flick: null,
+    msg: '', msgT: 0,
+    keys: {},
+  };
+  const CAM_MODES = ['投げた人の目', 'ディスクを追う', '真上から'];
+  const chase = { p: null };
+
+  // ---------------- 立っている味方（パスの的） ----------------
+  // base: 中心位置, amp: 往復の幅 [m], period: 往復の周期 [s]
+  const MATES = [
+    { n: 7, base: [10, 34], amp: [4, 0], period: 5 },
+    { n: 11, base: [27, 42], amp: [0, 5], period: 6 },
+    { n: 3, base: [18.5, 54], amp: [6, 0], period: 7 },
+    { n: 23, base: [7, 60], amp: [0, 5], period: 8 },
+    { n: 9, base: [30, 68], amp: [3, 3], period: 9 },   // いちばん遠い的（約50m。ハックの練習用）
+  ];
+  function matePos(m, t = S.time) {
+    if (!S.matesMove) return m.base.slice();
+    const s = Math.sin(2 * Math.PI * t / m.period);
+    return [m.base[0] + m.amp[0] * s, m.base[1] + m.amp[1] * s];
+  }
+  function mateVel(m, t = S.time) {
+    if (!S.matesMove) return [0, 0];
+    const c = Math.cos(2 * Math.PI * t / m.period) * 2 * Math.PI / m.period;
+    return [m.amp[0] * c, m.amp[1] * c];
+  }
+
+  const speedOf = (pw) => SPEED_MIN + (SPEED_MAX - SPEED_MIN) * pw;
+  function rightVec(yaw) { return [Math.cos(yaw), -Math.sin(yaw), 0]; }
+
+  // ピボットを踏む向き → 投げ方（右利き: 左=バック、右=フォア、後ろ=ハンマー。左利きは左右反転）
+  function typeOfPivot(pv, hand) {
+    if (pv === 'B') return 'hammer';
+    const bhSide = hand === 'R' ? 'L' : 'R';
+    if (pv === 'LT' || pv === 'RT') return pv[0] === bhSide ? 'scoober' : 'highfore';   // 上の段の左右
+    return pv === bhSide ? 'backhand' : 'forehand';
+  }
+  const noWrist = (type) => type === 'hammer' || type === 'scoober';   // 頭の上・肩越しの投げ: 手首のクセをかけない・ノーズは 0
+  const currentType = () => typeOfPivot(S.pivot, S.hand);
+  const PIVOT_LABEL = { L: '左へ踏む', B: '後ろへ踏む・高く', R: '右へ踏む', LT: '左へ踏む・高く', RT: '右へ踏む・高く' };
+  const PIVOT_KEY = { L: 'A', B: 'S', R: 'D' };
+  // フェードする側（-1=左, +1=右）: 回転の向きで決まる
+  function fadeSideOf(type, hand) {
+    const T = P.THROW_TYPES[type];
+    return T.spin * (hand === 'L' ? -1 : 1) < 0 ? -1 : 1;
+  }
+
+  // 踏み出した足の位置（左右は0.8m、後ろは0.6m）
+  function pivotFoot() {
+    if (S.pivA !== undefined) return PIV.foot(S.foot, S.yaw, S.pivA);   // スライドの位置
+    const r = rightVec(S.yaw), f = [Math.sin(S.yaw), Math.cos(S.yaw)];
+    if (S.pivot[0] === 'L') return [S.foot[0] - r[0] * 0.8, S.foot[1] - r[1] * 0.8];
+    if (S.pivot[0] === 'R') return [S.foot[0] + r[0] * 0.8, S.foot[1] + r[1] * 0.8];
+    return [S.foot[0] - f[0] * 0.6, S.foot[1] - f[1] * 0.6];
+  }
+  const autoNose = (type) => (noWrist(type) ? 0 : 3);
+  const wristOf = (type) => (noWrist(type) ? 0 : S.wrist);   // ハンマーには手首のクセをかけない
+  const effectiveNose = () => (S.assistNose ? autoNose(currentType()) : S.nose);
+
+  // 照準の先: 視線が「胸の高さ」の面と交わる点。上を向いているときは無し（ハックは補正しない）
+  function aimTarget() {
+    const sp = Math.sin(S.pitch), cp = Math.cos(S.pitch);
+    if (sp > -0.002) return null;
+    const dist = (CATCH_Z - EYE_H) / sp * cp;
+    if (dist < 3 || dist > 90) return null;
+    const pf = pivotFoot();
+    return { p: [pf[0] + Math.sin(S.yaw) * dist, pf[1] + Math.cos(S.yaw) * dist, CATCH_Z], dist };
+  }
+
+  // その条件で投げたとき、bearing 方向に D m 進んだ地点での「高さ・横のずれ・時刻」（届かなければ null）
+  function passAt(o, D, bearing = o.yaw) {
+    const d = P.makeThrow(o);
+    const fx = Math.sin(bearing), fy = Math.cos(bearing);
+    const along = (p) => (p[0] - o.foot[0]) * fx + (p[1] - o.foot[1]) * fy;
+    const side = (p) => (p[0] - o.foot[0]) * fy - (p[1] - o.foot[1]) * fx;   // + = 右
+    let prev = d.p.slice(), pt = 0;
+    for (let i = 0; i < 900 && d.phase === 'flight'; i++) {
+      pt = d.t;
+      P.step(d, 1 / 60);
+      const a = along(d.p);
+      if (a >= D) {
+        const a0 = along(prev), k = (D - a0) / ((a - a0) || 1);
+        const lerp = (u, v) => u + (v - u) * k;
+        const q = [lerp(prev[0], d.p[0]), lerp(prev[1], d.p[1]), lerp(prev[2], d.p[2])];
+        return { z: q[2], lat: side(q), t: lerp(pt, d.t) };
+      }
+      prev = d.p.slice();
+    }
+    return null;
+  }
+  // 前方 D m を「胸の高さ」で通る打ち出し角度を探す。届かないときは null
+  function solveLaunch(base, D, bearing) {
+    const h = (L) => { const r = passAt(Object.assign({}, base, { launch: L }), D, bearing); return r ? r.z : -1; };
+    let lo = -12, hi = null;
+    if (h(lo) >= CATCH_Z) return lo;
+    for (let L = -9; L <= 42; L += 3) {
+      if (h(L) >= CATCH_Z) { hi = L; break; }
+      lo = L;
+    }
+    if (hi === null) return null;
+    for (let i = 0; i < 8; i++) {
+      const m = (lo + hi) / 2;
+      if (h(m) >= CATCH_Z) hi = m; else lo = m;
+    }
+    return hi;
+  }
+  // いまの設定で（自分で）投げたときの条件をつくる。照準補正もここで行う
+  function buildThrow(speed, yawOffset = 0, hyzer = S.hyzer) {
+    const o = { foot: pivotFoot(), yaw: S.yaw + yawOffset, launch: S.pitch / DEG, speed,
+      nose: effectiveNose(), hyzer, type: currentType(), hand: S.hand, wristBias: wristOf(currentType()), drop: eyeDrop() };
+    let aim = null;
+    if (S.assistAim) {
+      const tg = aimTarget();
+      if (tg) {
+        const L = solveLaunch(o, tg.dist);
+        aim = { tg, ok: L !== null };
+        if (L !== null) o.launch = L;
+      }
+    }
+    return { o, aim };
+  }
+
+  // おまかせパス: 味方 m の「走る先」に、胸の高さで届く投げ方を探す
+  //   1) 飛ぶ時間を見積もって走る先を決める → 2) 打ち出し角度を探す
+  //   3) 曲がりで横にずれた分だけ向きを直す → これを数回くり返す
+  function autoPass(m) {
+    const foot = pivotFoot(), type = currentType();
+    let tFlight = 0.9, yawAdj = 0, best = null;
+    for (let it = 0; it < 4; it++) {
+      const mp = matePos(m, S.time + tFlight), mv = mateVel(m);
+      const tgt = [mp[0], mp[1]];
+      const dx = tgt[0] - foot[0], dy = tgt[1] - foot[1];
+      const D = Math.hypot(dx, dy), bearing = Math.atan2(dx, dy);
+      // 距離に応じた強さ（短いパスは速く低く、長いパスは強く）
+      let speed = type === 'scoober' ? clamp(8 + 0.4 * D, 10, 17) : type === 'hammer' ? clamp(9 + 0.35 * D, 13, 26) : clamp(10 + 0.45 * D, 12, 31);
+      const o = { foot, yaw: bearing + yawAdj, launch: 0, speed, nose: autoNose(type), hyzer: 0, type, hand: S.hand, wristBias: wristOf(type), drop: eyeDrop() };
+      let L = solveLaunch(o, D, bearing);
+      while (L === null && o.speed < SPEED_MAX) { o.speed = Math.min(SPEED_MAX, o.speed + 4); L = solveLaunch(o, D, bearing); }
+      if (L === null) return null;                       // 遠すぎて届かない
+      o.launch = L;
+      const r = passAt(o, D, bearing);
+      if (!r) return null;
+      best = o;
+      if (Math.abs(r.lat) < 0.15 && Math.abs(r.t - tFlight) < 0.05) break;
+      yawAdj -= r.lat / D;                               // 右にずれたら左へ向け直す
+      tFlight = r.t;
+      void mv;
+    }
+    return best;
+  }
+
+  function rollRightDeg() {   // UI表示用: 表面が右へ傾いている角度
+    const T = P.THROW_TYPES[currentType()];
+    return (S.hyzer - wristOf(currentType())) * fadeSideOf(currentType(), S.hand) + T.roll * (S.hand === 'L' ? -1 : 1);
+  }
+  function flash(m) { S.msg = m; S.msgT = 1.8; }
+
+  function launchDisc(o, info = {}) {
+    const d = P.makeThrow(o);
+    SND.play('throw', Math.max(0.2, Math.min(1, o.speed / 30)));   // 音: 投げる
+    const rec = Object.assign({ d, pts: [d.p.slice()], o, sum: null, restAt: null, caughtBy: null }, info);
+    if (S.ch && !S.ch.done && S.ch.thrown < CH_TRIES) { rec.ch = true; S.ch.thrown++; }   // チャレンジの1投
+    S.discs.push(rec);
+    if (S.discs.length > 6) S.discs.shift();
+    S.lastRec = rec;
+    chase.p = null;
+  }
+  // PC: ためて投げる
+  function doThrow() {
+    const pw = Math.max(0.05, S.power);
+    S.lastPower = pw;
+    const { o, aim } = buildThrow(speedOf(pw));
+    launchDisc(o, { aim, kind: '自分で' });
+  }
+  function quickPass(m) {
+    const o = autoPass(m);
+    if (!o) { flash(`#${m.n} は遠すぎて届かない`); return; }
+    launchDisc(o, { target: m, kind: 'おまかせ' });
+    flash(`おまかせパス → #${m.n}（${P.THROW_TYPES[o.type].label}）`);
+  }
+  // スマホ: ディスクから指でなぞって投げる（長くなぞるほど強い）
+
+  // なぞった道のりの長さ → 強さ（0〜1）。30px 未満は 0（投げない）。画面の高さの 6割（最低160px）で最強
+  function tracePower(path) {
+    let L = 0;
+    for (let k = 1; k < path.length; k++) L += Math.hypot(path[k].x - path[k - 1].x, path[k].y - path[k - 1].y);
+    const full = Math.max(160, innerHeight * 0.6);
+    return { L, pw: clamp((L - 30) / (full - 30), 0, 1) };
+  }
+  function flickThrow(path) {
+    if (path.length < 3) return;
+    const end = path[path.length - 1], a0 = path[0];
+    // なぞって投げる: 強さ＝なぞった道のりの長さ、向き＝なぞり始めから終わりへの向き（はじく速さは使わない）
+    const { L, pw } = tracePower(path);
+    const vx = end.x - a0.x, vy = end.y - a0.y;
+    if (L < 30 || vy > -15) { flash('ディスクから上に向かってなぞってください（長くなぞるほど強く）'); return; }
+    const yawOff = clamp(Math.atan2(vx, -vy) * 0.6, -0.6, 0.6);
+    // カーブ: 指の軌跡が弦（始点と終点を結ぶ線）からどちらにふくらんだか
+    const a = path[0], cx = end.x - a.x, cy = end.y - a.y, cl = Math.hypot(cx, cy) || 1;
+    let bow = 0;
+    for (const p of path) {
+      const s = (cx * (p.y - a.y) - cy * (p.x - a.x)) / cl;   // + = 弦の右側
+      if (Math.abs(s) > Math.abs(bow)) bow = s;
+    }
+    // 右へふくらむ（最後は左へ曲がる指の動き）→ ディスクも左へ曲がる
+    // 指の曲がり → ディスクの傾き。実際に投げられるのは ±20°くらいまでなので、係数55・最大±18°（少しの曲がりは 0）。試合と同じ
+    const bend = bow / cl, bendUse = Math.sign(bend) * Math.max(0, Math.abs(bend) - 0.04);
+    const curveLeft = clamp(bendUse * 55, -18, 18);
+    // 表面を左へ傾ける（rollRight = -curveLeft）。ハイザー角は「フェード側へ傾けた角度」なので向きを換算する
+    const hz = Math.round(-curveLeft / fadeSideOf(currentType(), S.hand));
+    S.hyzer = clamp(hz, -60, 60);
+    S.lastPower = pw;
+    const { o, aim } = buildThrow(speedOf(pw), yawOff, S.hyzer);
+    launchDisc(o, { aim, kind: 'フリック' });
+  }
+  function setPivot(pv) {
+    SND.play('tick');   // 音: 区間の切り替え
+    const before = currentType();
+    S.pivot = pv;
+    const after = currentType();
+    if (noWrist(before) !== noWrist(after)) { S.hyzer = 0; S.nose = autoNose(after); }
+    flash(`${PIVOT_LABEL[pv]} → ${P.THROW_TYPES[after].label}`);
+  }
+
+  // ピボットのスライド: 指の位置（pivTgt）へ足（pivA）が少し遅れてついてくる。投げ方の区間が変わったら切り替え
+  //   ほかの所（キーや自動操作）で S.pivot が直接変わったときは、その区間の真ん中へ合わせる
+  function pivotTick(dt) {
+    if (S.pivot !== S.pivZ) { S.pivA = S.pivTgt = PIV.center(S.pivot); S.pivB = S.pivTgtB = PIV.centerB(S.pivot); }
+    if (!IS_TOUCH) { const kx = (S.keys.KeyD ? 1 : 0) - (S.keys.KeyA ? 1 : 0); if (kx) S.pivTgt = clamp(S.pivTgt + kx * 1.4 * dt, -1, 1); const ky = (S.keys.KeyW ? 1 : 0) - (S.keys.KeyS ? 1 : 0); if (ky) S.pivTgtB = clamp((S.pivTgtB ?? 0.5) + ky * 1.2 * dt, 0, 1); }
+    S.pivA = PIV.follow(S.pivA, S.pivTgt, dt);
+    S.pivB = PIV.follow(S.pivB ?? 0.5, S.pivTgtB ?? 0.5, dt);
+    const z = PIV.zone(S.pivA, S.pivB, S.pivot);
+    if (z !== S.pivot) setPivot(z);
+    S.pivZ = S.pivot;
+  }
+  const eyeDrop = () => PIV.drop(S.pivB ?? 0.5);   // パッドの下へ動かすほど目の高さが下がる（姿勢が低くなる）
+  const pivLab = (pv) => P.THROW_TYPES[typeOfPivot(pv, S.hand)].label;
+  const pivState = (caption) => ({ a: S.pivA || 0, b: S.pivB ?? 0.5, tgt: S.pivTgt || 0, tgtB: S.pivTgtB ?? 0.5, zone: S.pivot, caption,
+    labels: { L: pivLab('L'), R: pivLab('R'), LT: pivLab('LT'), B: pivLab('B'), RT: pivLab('RT') } });
+
+  // ---------------- 設定メニュー（スマホ・PC共通） ----------------
+  const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('menu');
+  const onoff = (b) => (b ? 'オン' : 'オフ');
+  // ===== チャレンジ（お題と星）=====
+  const CH_KEY = 'ufps_challenges', CH_TRIES = 5, HOOP_Z = 1.3;
+  const CHALLENGES = [
+    { id: 'c1', name: 'まっすぐ20m', desc: '20m先の輪にディスクを通す', target: [18.5, 38], r: 1.5 },
+    { id: 'c2', name: 'ロング40m', desc: '40m先の輪に通す（遠くへ強く）', target: [18.5, 58], r: 2.0 },
+    { id: 'c3', name: 'カーブで回りこむ', desc: '間の壁をよけて、右奥の輪に通す', target: [24, 43], r: 1.8, wall: { p: [21.5, 31], w: 2.4, h: 3.2 } },
+    { id: 'c4', name: 'ハンマーで壁を越す', desc: '高い壁（2.6m）の上を越して、奥の輪に通す', target: [18.5, 40], r: 2.0, wall: { p: [18.5, 25], w: 5, h: 2.6 } },
+    { id: 'c5', name: '向かい風で25m', desc: '向かい風 4m の中で、25m先の輪に通す', target: [18.5, 43], r: 1.8, wind: [2, 0] },
+    { id: 'c6', name: '横風を読む', desc: '右から 7m の横風。流されるのを見越して 30m先の輪に通す', target: [18.5, 48], r: 2.0, wind: [3, 2] },
+  ];
+  const chBest = () => { try { return JSON.parse(localStorage.getItem(CH_KEY) || '{}'); } catch (e) { return {}; } };
+  const stars = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
+  const starsOf = (hits) => (hits >= 5 ? 3 : hits >= 3 ? 2 : hits >= 1 ? 1 : 0);
+  function startChallenge(i) {
+    const c = CHALLENGES[i];
+    if (!S.ch) S.chSaved = { windLv: S.windLv, windDir: S.windDir };
+    S.ch = { c, i, tries: 0, hits: 0, thrown: 0, marks: [], done: false };
+    S.discs = []; S.lastRec = null; S.foot = [18.5, FIELD.EZ]; S.yaw = 0; S.pitch = -1 * DEG;
+    if (c.wind) { S.windLv = c.wind[0]; S.windDir = c.wind[1]; } else S.windLv = 0;
+    applyWind();
+    flash(`チャレンジ: ${c.name}（${CH_TRIES}投）`);
+  }
+  function endChallenge() {
+    if (!S.ch) return;
+    S.ch = null;
+    if (S.chSaved) { S.windLv = S.chSaved.windLv; S.windDir = S.chSaved.windDir; applyWind(); }
+  }
+  function chResult(rec, ok, why) {
+    SND.play(ok ? 'chime' : 'turnover');   // 音: チャレンジの成功／失敗
+    const ch = S.ch;
+    rec.chRes = ok ? 'hit' : 'miss';
+    ch.tries++; if (ok) ch.hits++; ch.marks.push(ok);
+    if (ch.tries >= CH_TRIES) {
+      ch.done = true;
+      const n = starsOf(ch.hits), best = chBest();
+      const rec2 = n > (best[ch.c.id] || 0);
+      if (rec2) { best[ch.c.id] = n; try { localStorage.setItem(CH_KEY, JSON.stringify(best)); } catch (e) { /* 保存できない環境 */ } }
+      flash(`結果 ${stars(n)}（${ch.hits}/${CH_TRIES}）${rec2 ? '　自己ベスト！' : ''}`);
+      S.msgT = 4;
+    } else flash(ok ? `ナイス！（${ch.hits}/${ch.tries}）` : `${why}（${ch.hits}/${ch.tries}）`);
+  }
+  // 1投ごとの判定: 輪の面・壁の面（どちらも y が一定の縦の面）を通り過ぎた所で調べる
+  function chJudge(rec, prev) {
+    const ch = S.ch;
+    if (!ch || !rec.ch || rec.chRes) return;
+    const d = rec.d, c = ch.c, cur = d.p;
+    const cross = (y0) => {
+      if ((prev[1] - y0) * (cur[1] - y0) > 0 || prev[1] === cur[1]) return null;
+      const k = (y0 - prev[1]) / (cur[1] - prev[1]);
+      return [prev[0] + (cur[0] - prev[0]) * k, y0, prev[2] + (cur[2] - prev[2]) * k];
+    };
+    if (c.wall) { const q = cross(c.wall.p[1]); if (q && Math.abs(q[0] - c.wall.p[0]) < c.wall.w / 2 && q[2] < c.wall.h) { d.v = [0, 0, Math.min(0, d.v[2])]; return chResult(rec, false, '壁に当たった'); } }
+    const q = cross(c.target[1]);
+    if (q) {
+      const off = Math.hypot(q[0] - c.target[0], q[2] - HOOP_Z);
+      return off < c.r ? chResult(rec, true) : chResult(rec, false, `外れ（輪の中心から ${off.toFixed(1)}m）`);
+    }
+    if (d.phase !== 'flight') chResult(rec, false, '輪まで届かなかった');
+  }
+  function drawChallenge() {
+    const c = S.ch && S.ch.c;
+    if (!c) return;
+    const ring = [];
+    for (let i = 0; i <= 32; i++) { const a = i / 32 * Math.PI * 2; ring.push([c.target[0] + Math.cos(a) * c.r, c.target[1], Math.max(0.02, HOOP_Z + Math.sin(a) * c.r)]); }
+    polyline(ring, 'rgba(255,230,80,.95)', 4);
+    if (c.wall) {
+      const w = c.wall, x0 = w.p[0] - w.w / 2, x1 = w.p[0] + w.w / 2;
+      fillPoly([[x0, w.p[1], 0], [x1, w.p[1], 0], [x1, w.p[1], w.h], [x0, w.p[1], w.h]], 'rgba(247,117,37,.6)');
+    }
+  }
+  function drawChallengeHUD(u) {
+    const ch = S.ch;
+    if (!ch) return;
+    const w = 300 * u, x = W - w - 12 * u, y = 62 * u;
+    panel(x, y, w, 92 * u, 0.7);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = `bold ${15 * u}px "Meiryo UI", sans-serif`; ctx.fillStyle = '#FFE650';
+    ctx.fillText(`チャレンジ ${ch.i + 1}: ${ch.c.name}`, x + 12 * u, y + 22 * u);
+    ctx.font = `${11 * u}px "Meiryo UI", sans-serif`; ctx.fillStyle = '#e6e9f5';
+    ctx.fillText(ch.c.desc, x + 12 * u, y + 42 * u);
+    ctx.font = `bold ${16 * u}px "Meiryo UI", sans-serif`;
+    for (let i = 0; i < CH_TRIES; i++) {
+      const m = ch.marks[i];
+      ctx.fillStyle = m === undefined ? 'rgba(255,255,255,.35)' : m ? '#00CC99' : '#FF6699';
+      ctx.fillText(m === undefined ? '・' : m ? '○' : '×', x + (12 + i * 24) * u, y + 68 * u);
+    }
+    ctx.font = `${12 * u}px "Meiryo UI", sans-serif`; ctx.fillStyle = '#fff';
+    const best = chBest()[ch.c.id] || 0;
+    ctx.fillText(ch.done ? `結果 ${stars(starsOf(ch.hits))}　⚙からもう一度／次へ` : `成功 ${ch.hits}　自己ベスト ${stars(best)}`, x + 140 * u, y + 66 * u);
+    ctx.fillStyle = '#C7CDFD'; ctx.font = `${10 * u}px "Meiryo UI", sans-serif`;
+    ctx.fillText('1本 ★／3本 ★★／5本 ★★★', x + 140 * u, y + 82 * u);
+  }
+  const WIND_DIRS = [['向かい風', Math.PI], ['追い風', 0], ['右からの横風', -Math.PI / 2], ['左からの横風', Math.PI / 2]];   // 吹いていく向き（前が +y）
+  S.windLv = S.windLv || 0; S.windDir = S.windDir || 0;
+  const applyWind = () => WIND.set(WIND.LEVELS[S.windLv], WIND_DIRS[S.windDir][1]);
+  const MENU = [
+    { h: '音' },
+    { label: () => '効果音: ' + SND.SFX_NAME[SND.state.sfx], act: () => { SND.nextSfx(); SND.play('tick'); } },
+    { label: () => '声（ストールの読み上げ）: ' + (SND.state.voice === 'on' ? 'あり' : 'なし'), act: () => { SND.toggleVoice(); if (SND.state.voice === 'on') SND.speak('ストーリング、ワン'); } },
+    { h: '風' },
+    { label: () => '風の強さ: ' + WIND.LEVEL_NAME[S.windLv] + (S.windLv ? `（${WIND.LEVELS[S.windLv]}m/秒）` : ''), on: () => S.windLv > 0, act: () => { S.windLv = (S.windLv + 1) % 4; applyWind(); } },
+    { label: () => '風の向き: ' + WIND_DIRS[S.windDir][0], act: () => { S.windDir = (S.windDir + 1) % 4; applyWind(); } },
+    { h: 'チャレンジ（5投・星3つ）' },
+    ...CHALLENGES.map((c, i) => ({ label: () => `${i + 1} ${c.name}　${stars(chBest()[c.id] || 0)}`, on: () => !!(S.ch && S.ch.c === c), act: () => { startChallenge(i); menu.style.display = 'none'; } })),
+    { label: () => 'チャレンジをやめる', act: () => { endChallenge(); menu.style.display = 'none'; } },
+    { h: '補助' },
+    { label: () => '1 ノーズ角の自動: ' + onoff(S.assistNose), on: () => S.assistNose, act: () => { S.assistNose = !S.assistNose; } },
+    { label: () => '2 照準の補正: ' + onoff(S.assistAim), on: () => S.assistAim, act: () => { S.assistAim = !S.assistAim; } },
+    { label: () => '3 予想軌道: ' + onoff(S.predict), on: () => S.predict, act: () => { S.predict = !S.predict; } },
+    { label: () => '補助をまとめて切り替え', act: () => { const any = S.assistNose || S.assistAim || S.predict; S.assistNose = S.assistAim = S.predict = !any; } },
+    { h: '首振り', touchOnly: true },
+    { label: () => 'ジャイロ（傾けて首を振る）: ' + onoff(S.gyro), on: () => S.gyro, act: toggleGyro, touchOnly: true },
+    { label: () => 'ジャイロの向きを反転: ' + onoff(S.gyroInvert), on: () => S.gyroInvert, act: () => { S.gyroInvert = !S.gyroInvert; }, touchOnly: true },
+    { h: '練習' },
+    { label: () => '味方が動く: ' + onoff(S.matesMove), on: () => S.matesMove, act: () => { S.matesMove = !S.matesMove; } },
+    { label: () => '利き手: ' + (S.hand === 'R' ? '右' : '左'), act: () => { S.hand = S.hand === 'R' ? 'L' : 'R'; } },
+    { label: () => '手首のクセ（自然なアンハイザー）: ' + (S.wrist ? S.wrist + '°' : 'なし'), act: () => { S.wrist = { 0: 6, 6: 12, 12: 18, 18: 0 }[S.wrist]; } },
+    { label: () => '投げたあとの視点: ' + CAM_MODES[S.camMode], act: () => { S.camMode = (S.camMode + 1) % 3; } },
+    { label: () => 'スロー: ' + onoff(S.slow), on: () => S.slow, act: () => { S.slow = !S.slow; } },
+    { label: () => '軌跡を消す', act: () => { S.discs = []; S.lastRec = null; } },
+    { label: () => 'ホーム（モード選択）に戻る', act: () => { location.href = (/20261117_/.test(decodeURIComponent(location.pathname)) ? '20261117_メニュー_v3.html' : 'index.html') + '#modes'; } },
+    { label: () => '全画面にする', act: () => { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el); }, touchOnly: true },
+  ];
+  function renderMenu() {
+    menu.innerHTML = '';
+    for (const it of MENU) {
+      if (it.touchOnly && !IS_TOUCH) continue;
+      if (it.h) { const h = document.createElement('h3'); h.textContent = it.h; menu.appendChild(h); continue; }
+      const b = document.createElement('button');
+      b.textContent = it.label();
+      if (it.on && it.on()) b.className = 'on';
+      b.addEventListener('click', (e) => { e.stopPropagation(); it.act(); renderMenu(); });
+      menu.appendChild(b);
+    }
+  }
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = menu.style.display !== 'block';
+    menu.style.display = open ? 'block' : 'none';
+    if (open) { renderMenu(); if (document.pointerLockElement) document.exitPointerLock(); }
+  });
+
+  // ---------------- ジャイロ（スマホを傾けて首を振る） ----------------
+  let gyroBound = false;
+  function onMotion(e) {
+    if (!S.gyro || !e.rotationRate) return;
+    const dt = Math.min(0.1, (e.interval || 16) > 1 ? (e.interval || 16) / 1000 : (e.interval || 0.016));
+    const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 90;
+    // 横持ちでは「端末の x 軸」が上下、「y 軸」が左右になる。左右どちら向きに倒した横持ちかで符号が変わる
+    const s = (ang === 90 ? 1 : -1) * (S.gyroInvert ? -1 : 1);
+    const beta = e.rotationRate.beta || 0, gamma = e.rotationRate.gamma || 0;   // 度/秒
+    S.yaw -= s * beta * DEG * dt;
+    S.pitch = clamp(S.pitch - s * gamma * DEG * dt, -60 * DEG, 75 * DEG);
+  }
+  async function toggleGyro() {
+    if (S.gyro) { S.gyro = false; return; }
+    try {
+      // iPhone は最初に「動きと向き」へのアクセス許可が要る（ボタンを押したときにしか聞けない）
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        const r = await DeviceMotionEvent.requestPermission();
+        if (r !== 'granted') { flash('ジャイロの使用が許可されませんでした'); return; }
+      }
+      if (!gyroBound) { addEventListener('devicemotion', onMotion); gyroBound = true; }
+      S.gyro = true;
+      renderMenu();
+    } catch (err) { flash('この端末ではジャイロが使えません'); }
+  }
+
+  // ---------------- 開始 ----------------
+  const overlay = document.getElementById('overlay');
+  document.getElementById('start').addEventListener('click', () => {
+    overlay.style.display = 'none';
+    menuBtn.style.display = 'block';
+    S.started = true;
+    if (!IS_TOUCH) lockPointer();
+  });
+  function lockPointer() { try { cv.requestPointerLock && cv.requestPointerLock(); } catch (e) { /* 使えない環境では矢印キー */ } }
+  const locked = () => document.pointerLockElement === cv;
+
+  // ---------------- 入力: タッチ（スマホ） ----------------
+  // 画面上のボタン（CSS px 単位の四角）。毎フレーム位置を計算して、描画と当たり判定に使う
+  let buttons = [], pivBox = null;
+  function layoutTouchUI() {
+    const w = innerWidth, h = innerHeight;
+    const bw = Math.min(96, w * 0.11), bh = 46, gap = 8, x0 = 14, y0 = h - bh - 14;
+    buttons = [];   // 3つのボタンはやめて、スライドにした（pivBox）
+    pivBox = { x: 14, y: h - 110 - 14, w: clamp(w / 2 - 160, 150, 260), h: 110 }   // バックハンドで持つディスクの絵（画面の中央から左へ約140px）に重ならない幅;
+    return { disc: { x: w - 82, y: h - 82, r: 56 } };
+  }
+  let touchUI = layoutTouchUI();
+  addEventListener('resize', () => { touchUI = layoutTouchUI(); });
+  const touches = new Map();
+  let lastTouchAt = 0;
+  function hitMate(x, y) {      // 画面上の位置（CSS px）にいる味方
+    let best = null, bestZ = Infinity;
+    for (const m of MATES) {
+      const p = matePos(m);
+      const cf = toCam([p[0], p[1], 0]), ch = toCam([p[0], p[1], 1.8]);
+      if (cf[2] < 0.5) continue;
+      const sf = proj(cf), sh = proj(ch);
+      const s = focal / cf[2] / DPR;
+      const fx = sf[0] / DPR, fy = sf[1] / DPR, hy = sh[1] / DPR;
+      const padX = Math.max(26, 0.4 * s), pad = 22;
+      if (x > fx - padX && x < fx + padX && y > hy - pad && y < fy + pad / 2 && cf[2] < bestZ) { best = m; bestZ = cf[2]; }
+    }
+    return best;
+  }
+  cv.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' || !S.started) return;
+    e.preventDefault();
+    lastTouchAt = performance.now();
+    menu.style.display = 'none';
+    const x = e.clientX, y = e.clientY, now = performance.now();
+    if (PIV.hit(x, y, pivBox)) { [S.pivTgt, S.pivTgtB] = PIV.fromXY(x, y, pivBox); touches.set(e.pointerId, { role: 'pivot' }); return; }   // ピボットのスライド
+    const dk = touchUI.disc;
+    if (Math.hypot(x - dk.x, y - dk.y) < dk.r + 14) {
+      S.flick = [{ x, y, t: now }];
+      touches.set(e.pointerId, { role: 'flick' });
+      return;
+    }
+    touches.set(e.pointerId, { role: x < innerWidth * 0.5 ? 'look' : 'tap', x, y, x0: x, y0: y, t0: now });
+    cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+  }, { passive: false });
+  cv.addEventListener('pointermove', (e) => {
+    const t = touches.get(e.pointerId);
+    if (!t) return;
+    e.preventDefault();
+    const x = e.clientX, y = e.clientY;
+    if (t.role === 'flick') { S.flick.push({ x, y, t: performance.now() }); return; }
+    if (t.role === 'pivot') { [S.pivTgt, S.pivTgtB] = PIV.fromXY(x, y, pivBox); return; }
+    if (t.role === 'tap' && Math.hypot(x - t.x0, y - t.y0) > 14) t.role = 'look';   // 右側でもドラッグなら首振り
+    if (t.role === 'look') {
+      S.yaw += (x - t.x) * 0.006;
+      S.pitch = clamp(S.pitch - (y - t.y) * 0.006, -60 * DEG, 75 * DEG);
+      t.x = x; t.y = y;
+    }
+  }, { passive: false });
+  function endTouch(e) {
+    const t = touches.get(e.pointerId);
+    if (!t) return;
+    touches.delete(e.pointerId);
+    lastTouchAt = performance.now();
+    if (t.role === 'flick' && S.flick) { S.flick.push({ x: e.clientX, y: e.clientY, t: performance.now() }); flickThrow(S.flick); S.flick = null; }
+    if (t.role === 'tap' && performance.now() - t.t0 < 400) {
+      const m = hitMate(e.clientX, e.clientY);
+      if (m) quickPass(m); else flash('味方（青）をタップするとパス／右下のディスクからなぞると自分で投げる');
+    }
+  }
+  cv.addEventListener('pointerup', endTouch);
+  cv.addEventListener('pointercancel', endTouch);
+
+  // ---------------- 入力: マウスとキーボード（PC） ----------------
+  cv.addEventListener('mousedown', (e) => {
+    if (!S.started || performance.now() - lastTouchAt < 1000) return;
+    menu.style.display = 'none';
+    if (!locked()) { lockPointer(); return; }
+    if (e.button === 0) { S.charging = true; S.power = 0; S.chargeT = 0; }
+  });
+  addEventListener('mouseup', (e) => {
+    if (e.button !== 0 || !S.charging) return;
+    S.charging = false;
+    if (S.chargeT < QUICK_CLICK) {
+      if (S.aimMate) quickPass(S.aimMate);
+      else flash('味方に照準を合わせて短くクリック＝おまかせパス／長押し＝自分で投げる');
+    } else doThrow();
+    S.power = 0;
+  });
+  addEventListener('mousemove', (e) => {
+    if (!locked()) return;
+    S.yaw += e.movementX * 0.0022;
+    S.pitch = clamp(S.pitch - e.movementY * 0.0022, -60 * DEG, 75 * DEG);
+  });
+  addEventListener('wheel', (e) => {
+    if (!S.started) return;
+    const dlt = e.deltaY || e.deltaX;   // Shift中は横スクロール扱いになるブラウザがあるので両方見る
+    if (!dlt) return;
+    const up = dlt < 0;
+    if (e.shiftKey) {
+      if (S.assistNose) { flash('ノーズ角は自動です（1 キーで補助を切ると自分で決められる）'); return; }
+      S.nose = clamp(S.nose + (up ? 1 : -1), -15, 25);
+    } else {
+      S.hyzer = clamp(S.hyzer + (up ? 2 : -2), -60, 60);
+    }
+  }, { passive: true });
+  addEventListener('keydown', (e) => {
+    S.keys[e.code] = true;
+    if (!S.started) return;
+    switch (e.code) {
+      // A・D＝左右、W・S＝高さ。長押しで少しずつ（pivotTick）
+      case 'Digit1': S.assistNose = !S.assistNose; flash('補助1 ノーズ角の自動: ' + onoff(S.assistNose)); break;
+      case 'Digit2': S.assistAim = !S.assistAim; flash('補助2 照準の補正: ' + onoff(S.assistAim)); break;
+      case 'Digit3': S.predict = !S.predict; flash('補助3 予想軌道: ' + onoff(S.predict)); break;
+      case 'KeyG': {
+        const any = S.assistNose || S.assistAim || S.predict;
+        S.assistNose = S.assistAim = S.predict = !any;
+        flash('補助をすべて' + onoff(!any) + (any ? '（全部自分で決める）' : ''));
+        break;
+      }
+      case 'KeyC': S.camMode = (S.camMode + 1) % 3; flash('投げたあとの視点: ' + CAM_MODES[S.camMode]); break;
+      case 'KeyT': S.slow = !S.slow; flash(S.slow ? 'スロー（1/4倍速）' : '通常の速さ'); break;
+      case 'KeyM': S.matesMove = !S.matesMove; flash('味方が動く: ' + onoff(S.matesMove)); break;
+      case 'KeyL': S.hand = S.hand === 'R' ? 'L' : 'R'; flash((S.hand === 'R' ? '右利き' : '左利き') + ' → ' + P.THROW_TYPES[currentType()].label); break;
+      case 'Backspace': S.discs = []; S.lastRec = null; flash('軌跡を消しました'); e.preventDefault(); break;
+      case 'KeyH': S.help = !S.help; break;
+      case 'Space':
+        if (!S.charging) { S.charging = true; S.power = 0; S.chargeT = QUICK_CLICK; }
+        e.preventDefault(); break;
+    }
+  });
+  addEventListener('keyup', (e) => {
+    S.keys[e.code] = false;
+    if (e.code === 'Space' && S.charging) { S.charging = false; doThrow(); S.power = 0; }
+  });
+
+  // ---------------- 更新 ----------------
+  function update(dt) {
+    const sdt = dt * (S.slow ? 0.25 : 1);
+    S.time += sdt;
+    WIND.tick(sdt);   // 突風
+    if (S.charging) {
+      S.chargeT += dt;
+      if (S.chargeT >= QUICK_CLICK) S.power = Math.min(1, S.power + dt / CHARGE_TIME);
+    }
+    const k = S.keys, rs = 1.6 * dt;
+    pivotTick(dt);   // 矢印キーでも首を振れる
+    if (k.ArrowLeft) S.yaw -= rs;
+    if (k.ArrowRight) S.yaw += rs;
+    if (k.ArrowUp) S.pitch = Math.min(75 * DEG, S.pitch + rs * 0.6);
+    if (k.ArrowDown) S.pitch = Math.max(-60 * DEG, S.pitch - rs * 0.6);
+
+    for (const rec of S.discs) {
+      const d = rec.d;
+      if (d.phase === 'rest') continue;
+      const prevP = d.p.slice();
+      P.step(d, sdt);
+      chJudge(rec, prevP);   // チャレンジの判定
+      if (rec.pts.length < 4000) rec.pts.push(d.p.slice());
+      // 味方のキャッチ: 体から1.2m以内・高さ0.3〜2.5m（手を伸ばす・跳ぶ分を含む）
+      if (d.phase === 'flight' && d.t > 0.15 && !S.ch) {   // チャレンジ中は味方がいない
+        for (const m of MATES) {
+          const mp = matePos(m);
+          if (Math.hypot(d.p[0] - mp[0], d.p[1] - mp[1]) < 1.2 && d.p[2] > 0.3 && d.p[2] < 2.5) {
+            rec.caughtBy = m;
+            const s = d.start;
+            rec.sum = { caught: true, along: Math.hypot(d.p[0] - s[0], d.p[1] - s[1]), hang: d.t, height: d.p[2] };
+            d.phase = 'rest'; d.v = [0, 0, 0]; d.p = [mp[0], mp[1], 1.3];
+            rec.restAt = performance.now();
+            flash(`キャッチ！ #${m.n}`); SND.play('catch');   // 音: キャッチ
+            break;
+          }
+        }
+      }
+      if (d.landing && !rec.sum) { rec.sum = P.summarize(d); if (!rec.caughtBy) SND.play('land'); }   // 音: 落ちた
+      if (d.phase === 'rest' && !rec.restAt) rec.restAt = performance.now();
+      if (rec.caughtBy) { const mp = matePos(rec.caughtBy); d.p = [mp[0], mp[1], 1.3]; }
+    }
+    // PC: 照準のいちばん近くにいる味方（おまかせパスの相手）
+    S.aimMate = null;
+    if (!IS_TOUCH) {
+      const pf = pivotFoot();
+      const f = [Math.sin(S.yaw) * Math.cos(S.pitch), Math.cos(S.yaw) * Math.cos(S.pitch), Math.sin(S.pitch)];
+      let bestAng = 6 * DEG;
+      for (const m of (S.ch ? [] : MATES)) {
+        const mp = matePos(m);
+        const dv = V.norm([mp[0] - pf[0], mp[1] - pf[1], 1.2 - EYE_H]);
+        const ang = Math.acos(clamp(V.dot(dv, f), -1, 1));
+        if (ang < bestAng) { bestAng = ang; S.aimMate = m; }
+      }
+    }
+    // 照準補正と予想軌道（設定が変わったときだけ計算し直す）
+    const pw = S.charging ? Math.max(0.05, S.power) : S.lastPower;
+    const key = JSON.stringify([pivotFoot(), S.yaw, S.pitch, pw, S.nose, S.hyzer, S.pivot, S.hand,
+      S.assistNose, S.assistAim, S.predict, S.windLv, S.windDir]);
+    const now = performance.now();
+    if (key !== S.calcKey && now - S.calcAt > 60) {
+      S.calcKey = key; S.calcAt = now;
+      S.cur = buildThrow(speedOf(pw));
+      S.aim = S.cur.aim;
+      S.pred = S.predict ? P.simulate(S.cur.o, 10, 1 / 60) : null;
+    }
+    if (S.msgT > 0) S.msgT -= dt;
+  }
+
+  // ---------------- カメラ ----------------
+  const cam = { e: [0, 0, 0], f: [0, 1, 0], r: [1, 0, 0], u: [0, 0, 1] };
+  function setCam(eye, yaw, pitch) {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    cam.e = eye;
+    cam.f = [Math.sin(yaw) * cp, Math.cos(yaw) * cp, sp];
+    cam.r = rightVec(yaw);
+    cam.u = V.cross(cam.r, cam.f);
+  }
+  function lookAt(eye, target) {
+    const d = V.sub(target, eye);
+    setCam(eye, Math.atan2(d[0], d[1]), Math.atan2(d[2], Math.hypot(d[0], d[1])));
+  }
+  function activeFlight() {
+    const r = S.lastRec;
+    if (!r || S.charging || S.flick) return null;
+    if (r.d.phase !== 'rest') return r;
+    if (r.restAt && performance.now() - r.restAt < 1200) return r;
+    return null;
+  }
+  function placeCamera() {
+    const pf = pivotFoot();
+    const eye = [pf[0], pf[1], EYE_H - eyeDrop()];
+    const fl = activeFlight();
+    const mode = fl ? S.camMode : 0;
+    if (mode === 1) {
+      const d = fl.d;
+      const hv = [d.v[0], d.v[1]], hs = Math.hypot(hv[0], hv[1]);
+      const back = hs > 0.5 ? [hv[0] / hs, hv[1] / hs] : [Math.sin(S.yaw), Math.cos(S.yaw)];
+      const want = [d.p[0] - back[0] * 5, d.p[1] - back[1] * 5, Math.max(1.2, d.p[2] + 1.0)];
+      if (!chase.p) chase.p = eye.slice();
+      for (let i = 0; i < 3; i++) chase.p[i] += (want[i] - chase.p[i]) * 0.12;
+      lookAt(chase.p, d.p);
+      return 1;
+    }
+    if (mode === 2) {
+      const cy = Math.max(S.foot[1] + 20, Math.min(70, fl.d.p[1]));
+      setCam([18.5, cy - 8, 70], 0, -82 * DEG);
+      return 2;
+    }
+    setCam(eye, S.yaw, S.pitch);
+    return 0;
+  }
+
+  // ---------------- 投影 ----------------
+  const NEAR = 0.05;
+  function toCam(p) {
+    const d = [p[0] - cam.e[0], p[1] - cam.e[1], p[2] - cam.e[2]];
+    return [V.dot(d, cam.r), V.dot(d, cam.u), V.dot(d, cam.f)];
+  }
+  function proj(c) { return [W / 2 + c[0] / c[2] * focal, H / 2 - c[1] / c[2] * focal]; }
+  function clipPoly(cs) {
+    const out = [];
+    for (let i = 0; i < cs.length; i++) {
+      const a = cs[i], b = cs[(i + 1) % cs.length];
+      const ain = a[2] >= NEAR, bin = b[2] >= NEAR;
+      if (ain) out.push(a);
+      if (ain !== bin) {
+        const t = (NEAR - a[2]) / (b[2] - a[2]);
+        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, NEAR]);
+      }
+    }
+    return out;
+  }
+  function fillPoly(world, color) {
+    const c = clipPoly(world.map(toCam));
+    if (c.length < 3) return;
+    ctx.beginPath();
+    c.forEach((q, i) => { const s = proj(q); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  function rectZ(x0, y0, x1, y1, z = 0) { return [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]]; }
+  function polyline(pts, color, width, dash) {
+    ctx.strokeStyle = color; ctx.lineWidth = width * DPR;
+    ctx.setLineDash(dash ? dash.map((x) => x * DPR) : []);
+    ctx.beginPath();
+    let prev = null, pen = false;
+    for (const p of pts) {
+      const c = toCam(p);
+      if (prev) {
+        let a = prev, b = c;
+        if (a[2] < NEAR && b[2] < NEAR) { pen = false; prev = c; continue; }
+        if (a[2] < NEAR) { const t = (NEAR - a[2]) / (b[2] - a[2]); a = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, NEAR]; pen = false; }
+        if (b[2] < NEAR) { const t = (NEAR - a[2]) / (b[2] - a[2]); b = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, NEAR]; }
+        const sa = proj(a), sb = proj(b);
+        if (!pen) { ctx.moveTo(sa[0], sa[1]); pen = true; }
+        ctx.lineTo(sb[0], sb[1]);
+        if (c[2] < NEAR) pen = false;
+      }
+      prev = c;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function groundRing(cx, cy, r, color, width, n = 20) {
+    const ring = [];
+    for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2; ring.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0.006]); }
+    polyline(ring, color, width);
+  }
+
+  // ---------------- 背景・フィールド ----------------
+  const trees = [];
+  (function makeTrees() {
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 90; i++) {
+      const a = i / 90 * Math.PI * 2 + rnd() * 0.05;
+      const rad = 95 + rnd() * 40;
+      trees.push({ p: [18.5 + Math.cos(a) * rad * 0.8, 50 + Math.sin(a) * rad, 0], h: 7 + rnd() * 6, w: 2.5 + rnd() * 2, c: rnd() });
+    }
+  })();
+  // コーン: エンドゾーンの角（大きめ）＋サイドラインに10mごと（小さめ）。並んだコーンが小さくなっていくことで奥行きがわかる
+  const cones = [[0, 0], [37, 0], [0, 18], [37, 18], [0, 82], [37, 82], [0, 100], [37, 100]].map((c) => [c[0], c[1], 0.3]);
+  for (let y = 28; y <= 72; y += 10) { cones.push([-0.8, y, 0.18]); cones.push([37.8, y, 0.18]); }
+
+  // ---- 遠近感の手がかり ----
+  // 1) 空気遠近法: 遠いものほど空の色（もや）に近づける
+  const FOG = [214, 229, 240];
+  const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  function fogged(rgb, dist, strength = 1) {
+    const f = Math.min(0.85, (1 - Math.exp(-Math.max(0, dist) / 170)) * strength);
+    return `rgb(${rgb.map((c, i) => Math.round(c * (1 - f) + FOG[i] * f)).join(',')})`;
+  }
+  const camDist = (x, y) => Math.hypot(x - cam.e[0], y - cam.e[1]);
+  // 2) 足元の草（近くだけ）: 首を振ったときに近くが速く・遠くが遅く動いて見える
+  const tufts = [];
+  (function makeTufts() {
+    let seed = 11;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 700; i++) tufts.push([-6 + rnd() * 49, 4 + rnd() * 60, 0.06 + rnd() * 0.08, rnd()]);
+  })();
+  // 3) 遠くの山と雲（無限に遠いものとして、向きだけで位置が決まる）
+  const clouds = [];
+  (function makeClouds() {
+    let seed = 23;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 16; i++) clouds.push({ az: rnd() * Math.PI * 2, el: (6 + rnd() * 22) * DEG, w: (4 + rnd() * 7) * DEG, k: 2 + Math.floor(rnd() * 3) });
+  })();
+  const ridge = (az, seedOff, amp) =>
+    amp * (0.55 + 0.25 * Math.sin(az * 3 + seedOff) + 0.15 * Math.sin(az * 7 + seedOff * 2) + 0.05 * Math.sin(az * 17 + seedOff * 3));
+  function farPoint(az, el) {   // 向き（方位・仰角）だけで決まる遠くの点
+    return [cam.e[0] + Math.sin(az) * 5000, cam.e[1] + Math.cos(az) * 5000, cam.e[2] + Math.tan(el) * 5000];
+  }
+  function drawFar() {
+    const yaw = Math.atan2(cam.f[0], cam.f[1]);
+    // 画面の横の視野（半分）より少し広い範囲だけ描く。広すぎるとカメラの後ろに回り込んで描けなくなる
+    const half = Math.min(1.45, Math.atan(Math.tan(FOV / 2) * W / H) + 0.12);
+    // 雲
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (const c of clouds) {
+      for (let j = 0; j < c.k; j++) {
+        const q = toCam(farPoint(c.az + (j - c.k / 2) * c.w * 0.35, c.el + (j % 2) * c.w * 0.08));
+        if (q[2] <= 0) continue;
+        const s = proj(q), r = c.w * 0.3 * focal;
+        ctx.beginPath(); ctx.ellipse(s[0], s[1], r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // 山（2層: 奥は青っぽく高く、手前は緑で低く）
+    for (const [amp, col, off] of [[9 * DEG, '#b3c6d8', 1.3], [5.5 * DEG, '#93ac9e', 4.1]]) {
+      const pts = [];
+      for (let a = yaw - half; a <= yaw + half; a += 0.02) pts.push(farPoint(a, ridge(a, off, amp)));
+      pts.push(farPoint(yaw + half, -3 * DEG)); pts.push(farPoint(yaw - half, -3 * DEG));
+      const cs = pts.map(toCam);
+      if (cs.some((q) => q[2] <= 0)) continue;   // 真上・真下を向いたときは描かない
+      ctx.beginPath();
+      cs.forEach((q, i) => { const s = proj(q); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
+      ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+    }
+  }
+
+  function drawWorld() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#5d9bea'); g.addColorStop(0.55, '#b9d8f5'); g.addColorStop(1, '#e8f1fb');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    drawFar();
+    // フィールドの外の芝: 20m四方のタイルに分けて、遠いほどもやをかける
+    fillPoly(rectZ(-900, -900, 940, 1000), fogged([79, 138, 60], 400));
+    for (let x = -140; x < 180; x += 20) {
+      for (let y = -120; y < 220; y += 20) {
+        const shade = ((x / 20 + y / 20) & 1) ? [76, 134, 58] : [84, 143, 64];
+        fillPoly(rectZ(x, y, x + 20, y + 20, -0.001), fogged(shade, camDist(x + 10, y + 10)));
+      }
+    }
+    // フィールド: 5m四方の市松模様（芝刈りの跡）。縦横の線が奥へすぼまって見えるので距離がつかみやすい
+    for (let y = 0; y < FIELD.L; y += 5) {
+      const ez = y < FIELD.EZ || y >= FIELD.L - FIELD.EZ;
+      for (let x = 0; x < FIELD.W; x += 5) {
+        const odd = ((x / 5) + (y / 5)) % 2 === 1;
+        const rgb = ez ? (odd ? [72, 150, 68] : [84, 164, 79]) : (odd ? [88, 166, 72] : [104, 182, 86]);
+        fillPoly(rectZ(x, y, Math.min(FIELD.W, x + 5), y + 5), fogged(rgb, camDist(x + 2.5, y + 2.5)));
+      }
+    }
+    // 足元の草
+    ctx.lineCap = 'round';
+    for (const t of tufts) {
+      if (camDist(t[0], t[1]) > 30) continue;
+      const a = toCam([t[0], t[1], 0]);
+      if (a[2] < 0.5) continue;
+      const b = toCam([t[0] + 0.02, t[1], t[2]]);
+      if (b[2] < NEAR) continue;
+      const sa = proj(a), sb = proj(b);
+      ctx.strokeStyle = t[3] < 0.5 ? 'rgba(46,105,40,.75)' : 'rgba(150,205,110,.7)';
+      ctx.lineWidth = Math.max(1, 0.025 * focal / a[2]);
+      ctx.beginPath(); ctx.moveTo(sa[0], sa[1]); ctx.lineTo(sb[0], sb[1]); ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    for (let k = 1; k <= 8; k++) {   // 10mごとの距離の目安線
+      const y = S.foot[1] + k * 10;
+      if (y > FIELD.L + 15) break;
+      fillPoly(rectZ(-3, y - 0.04, 40, y + 0.04, 0.003), 'rgba(255,255,255,.28)');
+    }
+    const LW = 0.06, line = (x0, y0, x1, y1) => fillPoly(rectZ(x0, y0, x1, y1, 0.005), '#f4f4f4');
+    line(-LW, 0, LW, FIELD.L); line(FIELD.W - LW, 0, FIELD.W + LW, FIELD.L);
+    line(0, -LW, FIELD.W, LW); line(0, FIELD.L - LW, FIELD.W, FIELD.L + LW);
+    line(0, FIELD.EZ - LW, FIELD.W, FIELD.EZ + LW); line(0, FIELD.L - FIELD.EZ - LW, FIELD.W, FIELD.L - FIELD.EZ + LW);
+    for (const by of [FIELD.EZ + 20, FIELD.L - FIELD.EZ - 20]) {
+      line(18.5 - 0.5, by - LW, 18.5 + 0.5, by + LW); line(18.5 - LW, by - 0.5, 18.5 + LW, by + 0.5);
+    }
+  }
+  function drawTree(t) {
+    const base = toCam(t.p), top = toCam([t.p[0], t.p[1], t.h]);
+    if (base[2] < 1) return;
+    const b = proj(base), tp = proj(top);
+    const s = focal / base[2];
+    const dist = base[2];
+    ctx.fillStyle = fogged([91, 70, 50], dist);
+    ctx.fillRect(b[0] - 0.25 * s, Math.min(b[1], tp[1] + (b[1] - tp[1]) * 0.5), 0.5 * s, Math.abs(b[1] - tp[1]) * 0.5);
+    ctx.fillStyle = fogged(t.c < 0.5 ? [47, 93, 52] : [58, 107, 58], dist);
+    ctx.beginPath();
+    // 真上から見ると上下が逆転して半径が負になる（負の半径は描画エラー）ので絶対値をとる
+    ctx.ellipse(b[0], tp[1] + (b[1] - tp[1]) * 0.38, Math.abs(t.w * s), Math.max(1, Math.abs(b[1] - tp[1]) * 0.42), 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawCone(c) {
+    const hgt = c[2] || 0.3;
+    const base = toCam([c[0], c[1], 0]), top = toCam([c[0], c[1], hgt]);
+    if (base[2] < NEAR || top[2] < NEAR) return;
+    const b = proj(base), t = proj(top), s = focal / base[2];
+    const w = Math.max(1.5, 0.45 * hgt * s);
+    ctx.fillStyle = fogged([247, 117, 37], base[2], 0.7);
+    ctx.beginPath(); ctx.moveTo(t[0], t[1]);
+    ctx.lineTo(b[0] + w, b[1]); ctx.lineTo(b[0] - w, b[1]); ctx.closePath(); ctx.fill();
+  }
+  // 味方（人の形）: 足元と頭の位置を投影して、縦長に描く
+  function drawMate(m) {
+    const p = matePos(m);
+    const cf = toCam([p[0], p[1], 0]);
+    if (cf[2] < 0.5) return;
+    const sf = proj(cf), s = focal / cf[2];
+    const ch = toCam([p[0], p[1], 1.8]);
+    if (ch[2] < NEAR) return;
+    const sh = proj(ch);
+    const x = sf[0], hgt = sf[1] - sh[1];
+    const y = (z) => sf[1] - hgt * (z / 1.8);
+    const caught = S.lastRec && S.lastRec.caughtBy === m && activeFlight();
+    const targeted = S.aimMate === m;
+    const run = S.matesMove ? Math.sin(S.time * 9 + m.n) * 0.18 : 0;
+    // 影
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(x, sf[1], 0.35 * s, 0.08 * s, 0, 0, Math.PI * 2); ctx.fill();
+    // 脚
+    ctx.strokeStyle = '#1b2a4a'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1, 0.13 * s);
+    ctx.beginPath();
+    ctx.moveTo(x - 0.08 * s, y(0.95)); ctx.lineTo(x - 0.1 * s + run * s, y(0.02));
+    ctx.moveTo(x + 0.08 * s, y(0.95)); ctx.lineTo(x + 0.1 * s - run * s, y(0.02));
+    ctx.stroke();
+    // 腕（キャッチした瞬間は上に）
+    ctx.strokeStyle = '#e9c29b'; ctx.lineWidth = Math.max(1, 0.09 * s);
+    ctx.beginPath();
+    if (caught) {
+      ctx.moveTo(x - 0.2 * s, y(1.45)); ctx.lineTo(x - 0.28 * s, y(2.05));
+      ctx.moveTo(x + 0.2 * s, y(1.45)); ctx.lineTo(x + 0.28 * s, y(2.05));
+    } else {
+      ctx.moveTo(x - 0.2 * s, y(1.45)); ctx.lineTo(x - 0.3 * s, y(0.95));
+      ctx.moveTo(x + 0.2 * s, y(1.45)); ctx.lineTo(x + 0.3 * s, y(0.95));
+    }
+    ctx.stroke(); ctx.lineCap = 'butt';
+    // 胴体（青いユニフォーム）
+    ctx.fillStyle = targeted ? '#5f86ff' : '#3b6cff';
+    ctx.fillRect(x - 0.21 * s, y(1.5), 0.42 * s, y(0.92) - y(1.5));
+    // 頭
+    ctx.fillStyle = '#e9c29b';
+    ctx.beginPath(); ctx.arc(x, y(1.66), 0.12 * s, 0, Math.PI * 2); ctx.fill();
+    // 背番号
+    if (s > 14) {
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+      ctx.font = `bold ${Math.max(8, 0.22 * s)}px "Meiryo UI", sans-serif`;
+      ctx.fillText(String(m.n), x, y(1.12));
+    }
+    // 頭の上の番号札（遠くでも見えるように）
+    const fs = clamp(0.3 * s, 11 * DPR, 22 * DPR);
+    ctx.font = `bold ${fs}px "Meiryo UI", sans-serif`; ctx.textAlign = 'center';
+    ctx.fillStyle = targeted ? 'rgba(255,230,80,.95)' : 'rgba(16,24,44,.6)';
+    const tw = ctx.measureText('#' + m.n).width + 10 * DPR;
+    ctx.fillRect(x - tw / 2, y(1.8) - fs * 1.6, tw, fs * 1.3);
+    ctx.fillStyle = targeted ? '#10182c' : '#fff';
+    ctx.fillText('#' + m.n, x, y(1.8) - fs * 0.55);
+  }
+  function discBasis(n) {
+    let e1 = V.cross(n, [0, 0, 1]);
+    if (V.len(e1) < 1e-3) e1 = [1, 0, 0];
+    e1 = V.norm(e1);
+    return [e1, V.cross(n, e1)];
+  }
+  // ディスクの描き方は discdraw.js（厚み・模様・影・軌跡・遠くでも見える・画面外の矢印・持っているディスク）
+  const DD = DiscDraw.create({ ctx, toCam, proj, NEAR, V, getCam: () => cam, getFocal: () => focal, getDPR: () => DPR, getW: () => W, getH: () => H });
+  function drawDisc(d) { DD.drawDisc(d); }
+  function drawShadow(d) {
+    if (d.p[2] < 0.03) return;
+    const ring = [];
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ring.push([d.p[0] + Math.cos(a) * DISC_R, d.p[1] + Math.sin(a) * DISC_R, 0.004]); }
+    fillPoly(ring, 'rgba(0,0,0,.28)');
+  }
+  function label3D(p, txt, color = '#fff') {
+    const c = toCam(p);
+    if (c[2] < NEAR) return;
+    const s = proj(c);
+    const fs = Math.max(11, Math.min(26, 14 * 40 / c[2])) * DPR;
+    ctx.font = `bold ${fs}px "Meiryo UI", sans-serif`; ctx.textAlign = 'center';
+    ctx.lineWidth = 3 * DPR; ctx.strokeStyle = 'rgba(0,0,0,.55)';
+    ctx.strokeText(txt, s[0], s[1]); ctx.fillStyle = color; ctx.fillText(txt, s[0], s[1]);
+  }
+  function drawDistanceLabels() {
+    ctx.textAlign = 'center';
+    for (let k = 1; k <= 8; k++) {
+      const y = S.foot[1] + k * 10;
+      if (y > FIELD.L + 15) break;
+      for (const x of [-2, FIELD.W + 2]) {
+        const c = toCam([x, y, 0.2]);
+        if (c[2] < 1 || c[2] > 52) continue;   // 遠い表示は重なって読めないので出さない
+        const s = proj(c);
+        const fs = Math.max(10, Math.min(30, 600 / c[2])) * DPR;
+        ctx.font = `bold ${fs}px "Meiryo UI", sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,.85)';
+        ctx.fillText(k * 10 + 'm', s[0], s[1]);
+      }
+    }
+  }
+
+  function drawScene() {
+    drawWorld();
+    const items = [];
+    for (const t of trees) items.push({ z: toCam(t.p)[2], f: () => drawTree(t) });
+    for (const c of cones) items.push({ z: toCam([c[0], c[1], 0])[2], f: () => drawCone(c) });
+    if (S.windLv) for (const fb of WIND.FLAGS) items.push({ z: toCam([fb[0], fb[1], 0])[2], f: () => WIND.drawFlag(ctx, fb, toCam, proj, NEAR, DPR) });   // 四隅の旗
+    if (!S.ch) for (const m of MATES) { const p = matePos(m); items.push({ z: toCam([p[0], p[1], 0])[2], f: () => drawMate(m) }); }
+    if (S.ch) { const c = S.ch.c; items.push({ z: toCam([c.target[0], c.target[1], HOOP_Z])[2], f: drawChallenge }); }   // 輪と壁
+    items.sort((a, b) => b.z - a.z);
+    for (const it of items) if (it.z > 0) it.f();
+    drawDistanceLabels();
+    const flying = activeFlight();
+    if (S.predict && S.pred && !flying) {
+      polyline(S.pred.points.filter((_, i) => i % 2 === 0), 'rgba(255,230,80,.9)', 2, [6, 6]);
+      const L = S.pred.disc.landing;
+      if (L) groundRing(L.p[0], L.p[1], 0.5, 'rgba(255,230,80,.9)', 2, 16);
+    }
+    if (S.assistAim && S.aim && S.aim.tg && !flying) {
+      const T = S.aim.tg.p;
+      groundRing(T[0], T[1], 0.7, S.aim.ok ? 'rgba(255,255,255,.9)' : 'rgba(255,102,153,.9)', 2);
+    }
+    for (const rec of S.discs) {
+      const isLast = rec === S.lastRec;
+      polyline(rec.pts.filter((_, i) => i % 2 === 0 || i === rec.pts.length - 1),
+        isLast ? 'rgba(255,102,153,.95)' : 'rgba(255,255,255,.45)', isLast ? 2.5 : 1.5);
+      if (rec.d.landing && !rec.caughtBy) {
+        const L = rec.d.landing.p;
+        groundRing(L[0], L[1], 0.6, isLast ? '#FF6699' : 'rgba(255,102,153,.55)', 2.5, 24);
+        if (rec.sum) label3D([L[0], L[1], 0.8], rec.sum.along.toFixed(1) + 'm');
+      }
+    }
+    const ds = S.discs.map((r) => r.d).sort((a, b) => toCam(b.p)[2] - toCam(a.p)[2]);
+    for (const d of ds) drawShadow(d);
+    for (const d of ds) drawDisc(d);
+  }
+
+  // ---------------- 画面の表示（HUD） ----------------
+  function rr(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+  function panel(x, y, w, h, alpha = 0.62) { ctx.fillStyle = `rgba(16,24,44,${alpha})`; rr(x, y, w, h, 10 * UI); ctx.fill(); }
+  function text(t, x, y, size, color = '#fff', align = 'left', bold = false, scale = UI) {
+    ctx.font = `${bold ? 'bold ' : ''}${size * scale}px "Meiryo UI", "Hiragino Sans", sans-serif`;
+    ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(t, x, y);
+  }
+
+  function drawResults(u) {
+    const rec = S.lastRec;
+    const rowsH = IS_TOUCH ? 4 : 8;
+    panel(12 * u, 12 * u, 250 * u, (44 + rowsH * 21) * u);
+    text('前回の投げ', 26 * u, 36 * u, 15, '#C7CDFD', 'left', true);
+    if (!rec) { text('まだ投げていません', 26 * u, 64 * u, 13, '#aab4d4'); return; }
+    const o = rec.o, s = rec.sum;
+    let result = '飛行中…';
+    if (s && s.caught) result = `キャッチ #${rec.caughtBy.n}（${s.along.toFixed(1)}m）`;
+    else if (s) result = `落ちた ${s.along.toFixed(1)}m`;
+    const side = s && !s.caught ? (Math.abs(s.sideways) < 0.05 ? '0.0 m' : (s.sideways > 0 ? '右へ ' : '左へ ') + Math.abs(s.sideways).toFixed(1) + ' m') : '—';
+    const rows = [
+      ['投げ方', `${P.THROW_TYPES[o.type].label}（${rec.kind || ''}）`],
+      ['結果', result],
+      ['初速', o.speed.toFixed(1) + ' m/s'],
+      ['滞空時間', (s ? s.hang : rec.d.t).toFixed(2) + ' 秒'],
+      ['打出 / ノーズ / ハイザー', `${o.launch.toFixed(0)}° / ${o.nose}° / ${o.hyzer}°`],
+      ['横のずれ', side],
+      ['最高点', rec.d.maxZ.toFixed(1) + ' m'],
+      ['着地の向き', s && !s.caught ? (rec.d.landing.n[2] < 0 ? '裏向き' : '表向き') : '—'],
+    ].slice(0, rowsH);
+    rows.forEach((r, i) => {
+      text(r[0], 26 * u, (60 + i * 21) * u, 12, '#aab4d4');
+      text(r[1], 248 * u, (60 + i * 21) * u, 13, '#fff', 'right', true);
+    });
+  }
+
+  function drawHUD(mode) {
+    const u = UI;
+    if (S.windLv) WIND.drawHUD(ctx, 272 * u, 12 * u, u, Math.atan2(cam.f[0], cam.f[1]), 0);
+    drawChallengeHUD(u);   // チャレンジの表示（右上）   // 風の矢印と呼び方（左上の表示の右）
+    const flying = activeFlight();
+    if (mode === 0 && !flying) DD.drawHeld(currentType(), S.hand, rollRightDeg());   // 持っているディスク
+    if (flying) DD.drawOffscreen(flying.d);   // 画面の外なら矢印
+    // 照準
+    if (mode === 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2 * u;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 10 * u, H / 2); ctx.lineTo(W / 2 - 3 * u, H / 2);
+      ctx.moveTo(W / 2 + 3 * u, H / 2); ctx.lineTo(W / 2 + 10 * u, H / 2);
+      ctx.moveTo(W / 2, H / 2 - 10 * u); ctx.lineTo(W / 2, H / 2 - 3 * u);
+      ctx.moveTo(W / 2, H / 2 + 3 * u); ctx.lineTo(W / 2, H / 2 + 10 * u);
+      ctx.stroke();
+      if (!IS_TOUCH && S.aimMate) text(`#${S.aimMate.n} に短くクリックでパス`, W / 2, H / 2 + 30 * u, 13, '#FFE650', 'center', true);
+      else if (S.aim && S.aim.tg) {
+        const msg = S.aim.ok ? `ねらい ${S.aim.tg.dist.toFixed(0)}m` : `${S.aim.tg.dist.toFixed(0)}m 届かない（もっと強く）`;
+        text(msg, W / 2, H / 2 + 30 * u, 13, S.aim.ok ? '#ffffff' : '#FF6699', 'center', true);
+      }
+    }
+    drawResults(u);
+
+    if (IS_TOUCH) drawTouchHUD();
+    else drawPcHUD(u);
+
+    if (S.msgT > 0) {
+      ctx.globalAlpha = Math.min(1, S.msgT * 2);
+      text(S.msg, W / 2, H * 0.28, 20, '#fff', 'center', true);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawPcHUD(u) {
+    // 上: ピボット（踏む向き＝投げ方）
+    PIV.draw(ctx, { x: W / (2 * u) - 210, y: 4, w: 420, h: 90 }, u, pivState(null));   // ピボットのスライド
+    const on2 = (b) => (b ? 'ON' : 'OFF');
+    text(`${S.hand === 'R' ? '右利き' : '左利き'}　｜　投げたあとの視点: ${CAM_MODES[S.camMode]}　｜　${S.slow ? 'スロー' : '通常速度'}　｜　味方が動く ${on2(S.matesMove)}`,
+      W / 2, 62 * u, 12, 'rgba(255,255,255,.9)', 'center');
+    text(`補助（G で全部）　1 ノーズ自動 ${on2(S.assistNose)}　｜　2 照準補正 ${on2(S.assistAim)}　｜　3 予想軌道 ${on2(S.predict)}`,
+      W / 2, 82 * u, 12, (S.assistNose || S.assistAim || S.predict) ? '#C7CDFD' : '#FFB3CC', 'center');
+    // パワー
+    const pw = S.charging ? S.power : 0;
+    const bw = 320 * u, bh = 14 * u, bx = W / 2 - bw / 2, by = H - 46 * u;
+    panel(bx - 12 * u, by - 30 * u, bw + 24 * u, 58 * u);
+    const msg = S.charging && S.chargeT >= QUICK_CLICK ? `ためています… 初速 ${speedOf(pw).toFixed(1)} m/s`
+      : `短くクリック＝おまかせパス／長押し＝自分で投げる（前回 ${speedOf(S.lastPower).toFixed(1)} m/s）`;
+    text(msg, W / 2, by - 10 * u, 12, '#fff', 'center');
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(bx, by, bw, bh);
+    const gg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    gg.addColorStop(0, '#00CC99'); gg.addColorStop(0.6, '#7889FB'); gg.addColorStop(1, '#FF6699');
+    ctx.fillStyle = gg; ctx.fillRect(bx, by, bw * pw, bh);
+    drawAttitude(W - 300 * u, H - 236 * u, 288 * u, 224 * u);
+    if (S.help) {
+      const lines = [
+        'マウス: 首を振る　味方に照準＋短くクリック: おまかせパス',
+        '長押し: 自分で投げる　A/S/D: 左・後ろ・右へ踏む（＝投げ方）',
+        'ホイール: ハイザー角　Shift＋ホイール: ノーズ角　1〜3/G: 補助',
+        'C: 視点　T: スロー　L: 利き手　M: 味方が動く　H: 説明を隠す',
+      ];
+      panel(12 * u, H - 112 * u, 430 * u, 100 * u, 0.5);
+      lines.forEach((l, i) => text(l, 24 * u, H - (86 - i * 21) * u, 12, '#e6e9f5'));
+    }
+    if (S.started && !locked() && menu.style.display !== 'block') {
+      text('画面をクリックするとマウスで首を振れます（矢印キーでも操作可）', W / 2, H / 2 + 60 * u, 14, '#fff', 'center', true);
+    }
+  }
+
+  // スマホ: ピボットのボタン（左下）、フリックするディスク（右下）、指の軌跡
+  function drawTouchHUD() {
+    const d = DPR;
+    PIV.draw(ctx, pivBox, d, pivState('ピボット: 左右＝足の向き／上下＝離す高さ'));   // ピボットのスライド
+    const dk = touchUI.disc;
+    ctx.fillStyle = S.flick ? 'rgba(120,137,251,.5)' : 'rgba(16,24,44,.45)';
+    ctx.beginPath(); ctx.arc(dk.x * d, dk.y * d, dk.r * d, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fbfbfb';
+    ctx.beginPath(); ctx.ellipse(dk.x * d, dk.y * d, dk.r * 0.62 * d, dk.r * 0.3 * d, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#7889FB'; ctx.lineWidth = 3 * d;
+    ctx.beginPath(); ctx.ellipse(dk.x * d, dk.y * d, dk.r * 0.42 * d, dk.r * 0.18 * d, 0, 0, Math.PI * 2); ctx.stroke();
+    text('なぞって投げる', dk.x * d, (dk.y - dk.r - 8) * d, 11, '#fff', 'center', true, d);
+    if (S.flick && S.flick.length > 1) {
+      ctx.strokeStyle = 'rgba(255,230,80,.9)'; ctx.lineWidth = 4 * d; ctx.lineCap = 'round';
+      ctx.beginPath();
+      S.flick.forEach((p, i) => (i ? ctx.lineTo(p.x * d, p.y * d) : ctx.moveTo(p.x * d, p.y * d)));
+      ctx.stroke(); ctx.lineCap = 'butt';
+      {   // 強さの表示（なぞった長さ）
+        const tp = tracePower(S.flick), q = S.flick[S.flick.length - 1];
+        ctx.fillStyle = 'rgba(16,24,44,.75)'; ctx.fillRect((q.x - 46) * d, (q.y - 52) * d, 92 * d, 30 * d);
+        ctx.fillStyle = tp.pw >= 1 ? '#FF6699' : '#FFE650'; ctx.fillRect((q.x - 40) * d, (q.y - 30) * d, 80 * tp.pw * d, 5 * d);
+        ctx.font = `bold ${13 * d}px "Meiryo UI", sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+        ctx.fillText('強さ ' + Math.round(tp.pw * 100) + '%', q.x * d, (q.y - 34) * d);
+      }
+    }
+    if (S.started && S.discs.length === 0 && S.msgT <= 0) {
+      ctx.fillStyle = 'rgba(16,24,44,.55)';
+      rr(W / 2 - 230 * d, 10 * d, 460 * d, 26 * d, 8 * d); ctx.fill();
+      text('左半分をドラッグで首振り ／ 味方（青）をタップでパス ／ 右下からなぞって投げる',
+        W / 2, 28 * d, 12, '#fff', 'center', true, d);
+    }
+  }
+
+  // ディスクの傾きを2つの小さな図で示す（PCのみ。後ろから＝ハイザー、横から＝打出とノーズ）
+  function drawAttitude(x, y, w, h) {
+    const u = UI;
+    panel(x, y, w, h);
+    text('ディスクの角度', x + 14 * u, y + 24 * u, 14, '#C7CDFD', 'left', true);
+    const th = rollRightDeg() * DEG;
+    const cx1 = x + w * 0.27, cy1 = y + 92 * u, R = 46 * u;
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1 * u;
+    ctx.beginPath(); ctx.moveTo(cx1 - R - 8 * u, cy1); ctx.lineTo(cx1 + R + 8 * u, cy1); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 7 * u; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx1 - Math.cos(th) * R, cy1 - Math.sin(th) * R);
+    ctx.lineTo(cx1 + Math.cos(th) * R, cy1 + Math.sin(th) * R);
+    ctx.stroke();
+    ctx.strokeStyle = '#7889FB'; ctx.lineWidth = 3 * u;
+    ctx.beginPath(); ctx.moveTo(cx1, cy1);
+    ctx.lineTo(cx1 + Math.sin(th) * 28 * u, cy1 - Math.cos(th) * 28 * u); ctx.stroke();
+    ctx.lineCap = 'butt';
+    // 図は「実際の傾き」（入力＋手首のクセ）。文字は実際の傾きと、その内訳
+    const actual = S.hyzer - wristOf(currentType());
+    let hz = '平ら';
+    if (actual > 0) hz = 'ハイザー ' + actual + '°';
+    if (actual < 0) hz = 'アンハイザー ' + (-actual) + '°';
+    text('後ろから', cx1, y + 46 * u, 11, '#aab4d4', 'center');
+    text(hz, cx1, y + 140 * u, 13, '#fff', 'center', true);
+    if (wristOf(currentType())) text(`ホイール ${S.hyzer > 0 ? '+' : ''}${S.hyzer}° ＋ 手首のクセ`, cx1, y + 158 * u, 10, '#aab4d4', 'center');
+    const cx2 = x + w * 0.73, cy2 = cy1;
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1 * u;
+    ctx.beginPath(); ctx.moveTo(cx2 - R - 8 * u, cy2); ctx.lineTo(cx2 + R + 8 * u, cy2); ctx.stroke();
+    const launchDeg = S.cur ? S.cur.o.launch : S.pitch / DEG;
+    const noseDeg = effectiveNose();
+    const la = launchDeg * DEG, att = (launchDeg + noseDeg) * DEG;
+    ctx.strokeStyle = '#FFE650'; ctx.lineWidth = 2 * u; ctx.setLineDash([4 * u, 4 * u]);
+    ctx.beginPath(); ctx.moveTo(cx2, cy2); ctx.lineTo(cx2 + Math.cos(la) * (R + 6 * u), cy2 - Math.sin(la) * (R + 6 * u)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 7 * u; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx2 - Math.cos(att) * R * 0.8, cy2 + Math.sin(att) * R * 0.8);
+    ctx.lineTo(cx2 + Math.cos(att) * R * 0.8, cy2 - Math.sin(att) * R * 0.8);
+    ctx.stroke(); ctx.lineCap = 'butt';
+    text('横から（右が前）', cx2, y + 46 * u, 11, '#aab4d4', 'center');
+    text(`打出 ${launchDeg.toFixed(0)}°${S.assistAim && S.aim && S.aim.ok ? '(補正)' : ''}　ノーズ ${noseDeg > 0 ? '+' : ''}${noseDeg}°${S.assistNose ? '(自動)' : ''}`,
+      cx2, y + 150 * u, 12, '#fff', 'center', true);
+    text(`ピボット: ${PIVOT_LABEL[S.pivot]} → ${P.THROW_TYPES[currentType()].label}`, x + 14 * u, y + 180 * u, 12, '#e6e9f5');
+    text('点線＝打ち出す向き　白＝ディスク　青＝表の向き', x + 14 * u, y + 204 * u, 11, '#aab4d4');
+  }
+
+  // ---------------- ループ ----------------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+    SND.wind(S.windLv ? WIND.state.now : 0);   // 音: 風
+    const mode = placeCamera();
+    drawScene();
+    drawHUD(mode);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // 動作確認用（ブラウザのコンソールから触れるように）
+  // setTouch(true) でPCでもスマホ用の画面を確認できる
+  function setTouch(on) { IS_TOUCH = on; document.body.classList.toggle('touch', on); resize(); touchUI = layoutTouchUI(); }
+  window.__practice = { startChallenge, endChallenge, CHALLENGES, S, MATES, hitMate, doThrow, quickPass, flickThrow, autoPass, matePos, update, setTouch, get IS_TOUCH() { return IS_TOUCH; } };
+})();
+
+</script>
+<script>
+// 通信なしでも遊べるように、中身を覚えさせる係（sw.js）を登録する。https か このPC（localhost）で開いたときだけ動く
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

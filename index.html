@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>アルティメットFPS</title>
+<!-- ============================================================
+     メニュー v3（2026-11-20 林さん「Aの絵で進める」）
+     デザイン: A スポーツ中継（20261120_アプリのデザイン整理_v1.md）。背景は林さんが ChatGPT で作ったキービジュアル
+     ・ロゴと3つのモードを1画面に（前はタイトル → モード選択の2画面）
+     ・英字は Oswald、日本語は端末の書体。角は斜めに切る。差し色はチーム画面で選んだチームの色
+     ・設定の窓も同じ形に。チームの窓（team_ui.js）は今のまま
+     ============================================================ -->
+<style>
+  @font-face { font-family: Osw; src: url('assets/fonts/Oswald-Bold.ttf'); font-display: swap; }
+  :root { --team: #2460eb; --team-d: #0c1a4e; --ink: #0b1020; --sub: #b9c2dc;
+    --jp: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo UI", "Meiryo", sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); color: #fff; font-family: var(--jp);
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  .osw { font-family: Osw, Impact, "Arial Narrow", sans-serif; letter-spacing: .02em; }
+  /* 背景: キービジュアル（選手は右側）。左側を暗くして文字を読みやすく */
+  #kv { position: fixed; inset: 0; background: #0b1a3e url('assets/ui/keyvisual_team.jpg') left top / cover no-repeat; }   /* 主人公チームの絵（2026-11-20）。前の絵は keyvisual_a.jpg */
+  #kv::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,10,22,.35) 0%, rgba(6,10,22,.15) 30%, rgba(6,10,22,0) 45%); }
+  .wrap { position: fixed; inset: 0; padding: max(14px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left)); box-sizing: border-box; }
+  /* ロゴ */
+  .logo { position: absolute; left: max(30px, env(safe-area-inset-left)); top: max(9vh, 24px); }
+  .logo .l1 { font-size: clamp(42px, 15vh, 72px); line-height: .9; text-shadow: 0 4px 18px rgba(0,0,0,.35); }
+  .logo .l2 { display: inline-block; margin-top: 1vh; font-size: clamp(22px, 7.5vh, 34px); padding: 0 .45em; background: var(--team); transform: skewX(-12deg); }
+  .logo .l2 span { display: inline-block; transform: skewX(12deg); }
+  .logo .sub { margin-top: 1.4vh; font-size: clamp(10px, 2.8vh, 12px); color: var(--sub); letter-spacing: .04em; }
+  /* モードのボタン（斜めに切った帯） */
+  .menu { position: absolute; left: max(30px, env(safe-area-inset-left)); bottom: max(9vh, 22px); display: grid; gap: 1.6vh; }
+  .mode { display: flex; align-items: center; gap: 12px; width: clamp(240px, 36vw, 300px); height: clamp(36px, 11vh, 46px); padding-left: 18px; box-sizing: border-box;
+    color: #fff; text-decoration: none; transform: skewX(-12deg); background: rgba(255,255,255,.09); border-left: 4px solid rgba(255,255,255,.28);
+    transition: transform .12s, background .12s; }
+  .mode > * { transform: skewX(12deg); }
+  .mode b { font-size: clamp(17px, 5.4vh, 22px); font-weight: normal; }
+  .mode i { font-style: normal; font-size: clamp(10px, 2.9vh, 12px); color: #d7def2; }
+  .mode.main { height: clamp(44px, 14vh, 58px); background: var(--team); border-left-color: #fff; }
+  .mode.main b { font-size: clamp(22px, 7.4vh, 30px); }
+  .mode:active { transform: skewX(-12deg) translateX(4px); background: rgba(255,255,255,.18); } .mode.main:active { background: var(--team-d); }
+  /* 右上: チーム・設定 */
+  .top { position: absolute; right: max(18px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); display: flex; gap: 8px; }
+  .chip { font: inherit; color: #fff; border: 0; cursor: pointer; padding: 7px 16px; font-size: 12px; transform: skewX(-12deg); background: rgba(8,12,26,.72); border-bottom: 3px solid var(--team); }
+  .chip span { display: inline-block; transform: skewX(12deg); } .chip span b { font-family: Osw, Impact, sans-serif; font-weight: normal; letter-spacing: .04em; margin-right: 6px; }
+  /* 右下: いまのチーム／クレジット */
+  .myteam { margin-top: 1.2vh; font-size: 11px; color: var(--sub); }   /* いまのチーム（ロゴの下） */
+  .myteam b { font-family: Osw, Impact, sans-serif; font-weight: normal; font-size: 15px; color: #fff; letter-spacing: .04em; border-left: 4px solid var(--team); padding-left: 7px; margin-left: 8px; }
+  .credit { margin-top: 14px; font-size: 10px; color: var(--sub); line-height: 1.6; }   /* クレジット・日付（設定の窓の一番下） */
+  /* 縦向き: ロゴは上、モードは下。背景の選手は真ん中 */
+  @media (orientation: portrait) {
+    #kv { background-position: 72% center; }
+    #kv::after { background: linear-gradient(180deg, rgba(6,10,22,.8) 0%, rgba(6,10,22,.2) 30%, rgba(6,10,22,.2) 58%, rgba(6,10,22,.88) 100%); }
+    .logo { top: max(10vh, 60px); } .logo .l1 { font-size: 13vw; }
+    .menu { bottom: max(8vh, 40px); } .mode { width: calc(100vw - 70px); }
+  }
+  /* ---- 設定の窓（A の形） ---- */
+  #settings { position: fixed; inset: 0; background: rgba(4,8,18,.6); display: none; align-items: center; justify-content: center; z-index: 10; }
+  #settings .panel { width: min(560px, 94vw); max-height: 88vh; overflow: auto; background: rgba(9,13,28,.96); padding: 14px 20px 10px; box-sizing: border-box; border-left: 4px solid var(--team); }
+  #settings .hd { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; } #settings .hd b { font-size: 26px; font-weight: normal; } #settings .hd i { font-style: normal; font-size: 12px; color: var(--sub); }
+  #settings h4 { margin: 12px 0 2px; font-size: 11px; color: var(--sub); letter-spacing: .08em; font-weight: normal; } #settings h4 b { font-family: Osw, Impact, sans-serif; font-weight: normal; color: #fff; margin-right: 6px; letter-spacing: .06em; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 13px; }
+  .seg { display: flex; gap: 4px; }
+  .seg button { font: inherit; font-size: 12px; color: #fff; border: 0; padding: 6px 11px; background: rgba(255,255,255,.08); cursor: pointer; transform: skewX(-12deg); }
+  .seg button span { display: inline-block; transform: skewX(12deg); }
+  .seg button.on { background: var(--team); font-weight: bold; }
+  .close { position: sticky; bottom: -10px; display: flex; justify-content: flex-end; padding: 10px 0 8px; background: rgba(9,13,28,.96); }
+  .close button { font: inherit; color: #fff; border: 0; cursor: pointer; padding: 8px 22px; background: var(--team); transform: skewX(-12deg); font-size: 13px; }
+  .close button span { display: inline-block; transform: skewX(12deg); }
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Ultimate FPS">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1830">
+</head>
+<body>
+<div id="kv"></div>
+<div class="wrap">
+  <div class="logo"><div class="l1 osw">ULTIMATE</div><div class="l2 osw"><span>FPS</span></div><div class="sub">パスが通るたび、捕った味方の目へ。</div><div class="myteam">いまのチーム<b id="myTeamName">あなた</b></div></div>
+  <nav class="menu">
+    <a class="mode main" data-go="match"><b class="osw">PLAY</b><i>試合　7対7・5点先取</i></a>
+    <a class="mode" data-go="game"><b class="osw">ATTACK DRILL</b><i>攻撃パート</i></a>
+    <a class="mode" data-go="practice"><b class="osw">THROWING</b><i>投げ練習</i></a>
+  </nav>
+  <div class="top">
+    <button class="chip" id="openTeam"><span><b>TEAM</b>チーム</span></button>
+    <button class="chip" id="openSettings"><span><b>SETTINGS</b>設定</span></button>
+  </div>
+</div>
+
+<!-- 設定（試合で使う。この端末に保存） -->
+<section id="settings">
+  <div class="panel">
+    <div class="hd"><b class="osw">SETTINGS</b><i>設定</i></div>
+    <h4><b>MATCH</b>試合の条件</h4>
+    <div class="row">CPの強さ<div class="seg" data-key="cp"><button data-v="normal">ふつう</button><button data-v="strong">強い</button><button data-v="max">とても強い</button></div></div>
+    <div class="row">風（試合・攻撃パート）<div class="seg" data-key="wind"><button data-v="off">なし</button><button data-v="on">あり</button></div></div>
+    <div class="row">交代<div class="seg" data-key="sub"><button data-v="auto">自動</button><button data-v="manual">自分で選ぶ</button></div></div>
+    <h4><b>PLAYER</b>自分</h4>
+    <div class="row">利き手<div class="seg" data-key="hand"><button data-v="R">右</button><button data-v="L">左</button></div></div>
+    <div class="row">手首のクセ<div class="seg" data-key="wrist"><button data-v="0">なし</button><button data-v="6">6°</button><button data-v="12">12°</button><button data-v="18">18°</button></div></div>
+    <h4><b>ASSIST</b>投げの補助（自分で投げるとき）</h4>
+    <div class="row">ノーズ角の自動<div class="seg" data-key="nose"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
+    <div class="row">照準の補正<div class="seg" data-key="aim"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
+    <div class="row">飛んでいる間、ディスクを自動で追う<div class="seg" data-key="look"><button data-v="on">オン</button><button data-v="off">オフ</button></div></div>
+    <h4><b>SOUND</b>音</h4>
+    <div class="row">効果音<div class="seg" data-key="sfx"><button data-v="big">大</button><button data-v="small">小</button><button data-v="off">なし</button></div></div>
+    <div class="row">声（ストールの読み上げ）<div class="seg" data-key="voice"><button data-v="on">あり</button><button data-v="off">なし</button></div></div>
+    <h4><b>CREDITS</b>クレジット</h4>
+    <div class="credit">動きの一部: The 100STYLE Dataset - Ian Mason（CC BY 4.0、ゲーム用に加工）<br>CMU Graphics Lab Motion Capture Database（mocap.cs.cmu.edu）<br>文字: Oswald（The Oswald Project Authors、SIL Open Font License 1.1）<br>選手の3Dモデル: VRoid Studio（pixiv）で作成<br>ホーム画面の絵: ChatGPT（OpenAI）で生成<br>版: 2026-11-20</div>
+    <div class="close"><button id="closeSettings"><span>閉じる</span></button></div>
+  </div>
+</section>
+
+<script>
+/* 選手の顔ぶれ（能力・役割・個性・見た目・特殊スロー）。試合（match.js）とチーム作りの画面（team_ui.js）で同じものを使う
+ *   st: 速さ spd・切り返し cut・背の高さ hgt・キャッチ ctch・投げの正確さ acc・パワー pow・反応 rea・賢さ iq・体力 sta（1〜100、50 がふつう）
+ *   en: ユニフォームの背中の名前（ローマ字）／look.pc: パーソナルカラー（靴・手袋のベルト・番号のふち）／look.face: 顔（サンプルアバターの顔 C/V/X/Y/Z）／look.eye: 黒目の色／look.hs: 髪型（render3d.js の hairMesh。sC〜sZ はサンプルアバターの髪、v1〜v4・m1〜m2 は VRoid で作った髪型、s_ で始まるのは毛束で作った髪型）
+ *   2026-11-20 match.js から移した */
+window.UFPS_ROSTER = [
+    {   // 青（あなたのチーム）。2026-11-20 オリジナルのキャラに（先発7人はタイトルの絵の7人）
+      7: { name: '一ノ瀬 颯', en: 'ICHINOSE', role: 'C', st: { spd: 80, cut: 82, hgt: 50, ctch: 74, acc: 52, pow: 56, rea: 80, iq: 55, sta: 78 }, look: { hair: 'black', hs: 'm2', skin: 'light', shoes: 'black', acc: 'none', pc: [232, 44, 56] }, traits: ['clutch', 'diver'] },   // 主人公。まっすぐで負けず嫌い
+      11: { name: '白銀 玲', en: 'SHIROGANE', role: 'H', st: { spd: 52, cut: 70, hgt: 50, ctch: 50, acc: 90, pow: 52, rea: 66, iq: 84, sta: 52 }, look: { hair: 'silver', hs: 'm1', skin: 'pale', shoes: 'black', acc: 'none', pc: [70, 205, 240] }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['faker'] },   // クールで無口
+      3: { name: '春野 千夏', en: 'HARUNO', body: 'f', role: 'H', st: { spd: 52, cut: 60, hgt: 32, ctch: 66, acc: 82, pow: 40, rea: 56, iq: 74, sta: 90 }, look: { hair: 'brown', hs: 'v6', skin: 'light', shoes: 'black', acc: 'none', eye: 'brown', pc: [255, 208, 40] }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['mood'] },   // まとめ役
+      23: { name: '獅堂 剛', en: 'SHIDO', body: 'l', role: 'D', st: { spd: 70, cut: 50, hgt: 74, ctch: 72, acc: 44, pow: 88, rea: 48, iq: 45, sta: 70 }, look: { hair: 'blond', hs: 'm3', skin: 'medium', shoes: 'black', acc: 'none', eye: 'gold', pc: [255, 132, 28] }, sp: { fhT: 'highfore' }, traits: ['sky', 'bold'] },   // 熱血
+      9: { name: '藍沢 凛', en: 'AIZAWA', body: 'f', role: 'C', st: { spd: 72, cut: 90, hgt: 30, ctch: 52, acc: 48, pow: 46, rea: 88, iq: 52, sta: 86 }, look: { hair: 'navy', hs: 'sY', skin: 'fair', shoes: 'black', acc: 'none', eye: 'blue', face: 'Y', pc: [150, 92, 255] }, traits: ['tough'] },   // 切り返しはチーム一
+      14: { name: '桃瀬 ひなた', en: 'MOMOSE', body: 'f', role: 'D', st: { spd: 58, cut: 48, hgt: 72, ctch: 76, acc: 46, pow: 64, rea: 52, iq: 50, sta: 60 }, look: { hair: 'pink', hs: 'v5', skin: 'fair', shoes: 'black', acc: 'none', eye: 'pink', pc: [255, 105, 175] }, sp: { C: 'heli' }, traits: ['streaky', 'sky'] },   // 明るいお調子者
+      17: { name: '雪村 小春', en: 'YUKIMURA', body: 'f', role: 'H', st: { spd: 40, cut: 56, hgt: 30, ctch: 60, acc: 92, pow: 34, rea: 54, iq: 82, sta: 54 }, look: { hair: 'icy', hs: 'sC', skin: 'fair', shoes: 'black', acc: 'none', eye: 'sky', face: 'C', pc: [200, 232, 255] }, traits: ['pressure'] },   // 控え。投げは一番正確・緊張しやすい
+      21: { name: '黒崎 迅', en: 'KUROSAKI', role: 'C', st: { spd: 90, cut: 72, hgt: 48, ctch: 48, acc: 32, pow: 66, rea: 56, iq: 34, sta: 76 }, look: { hair: 'black', hs: 'sZ', skin: 'tan', shoes: 'black', acc: 'none', eye: 'red', face: 'Z', pc: [170, 232, 40] }, traits: ['bold'] },   // 控え。チーム一の俊足
+      33: { name: '大河 岳', en: 'OKAWA', body: 'l', role: 'D', st: { spd: 50, cut: 32, hgt: 92, ctch: 66, acc: 48, pow: 76, rea: 44, iq: 58, sta: 60 }, look: { hair: 'black', hs: 'buzz', skin: 'medium', shoes: 'black', acc: 'none', eye: 'brown', face: 'X', pc: [20, 175, 165] }, traits: ['slow'] },   // 控え。一番背が高い
+      5: { name: '翠川 智也', en: 'MIDORIKAWA', role: 'H', st: { spd: 46, cut: 58, hgt: 50, ctch: 56, acc: 88, pow: 50, rea: 54, iq: 92, sta: 50 }, look: { hair: 'green', hs: 'sV', skin: 'light', shoes: 'black', acc: 'glassesV', eye: 'green', face: 'V', pc: [40, 200, 120] }, sp: { bhD: 'air', fhD: 'air', C: 'heli' }, traits: ['careful'] },   // 司令塔
+    },
+    {   // 赤（相手）
+      1: { name: 'カエサル', en: 'CAESAR', role: 'H', st: { spd: 52, cut: 66, hgt: 46, ctch: 49, acc: 89, pow: 48, rea: 72, iq: 90, sta: 60 }, look: { hair: 'brown', hs: 'buzz', skin: 'medium', shoes: 'white', acc: 'laurel' }, sp: { fhT: 'highfore', fhM: 'sharp' }, traits: ['clutch'] },
+      2: { name: 'ハンニバル', en: 'HANNIBAL', role: 'H', st: { spd: 52, cut: 92, hgt: 32, ctch: 52, acc: 71, pow: 49, rea: 74, iq: 94, sta: 65 }, look: { hair: 'black', hs: 'curly', skin: 'tan', shoes: 'black', acc: 'whiteband' }, sp: { bhT: 'scoober', bhM: 'big', fhM: 'big' }, traits: ['faker'] },
+      4: { name: 'エリザベス', en: 'ELIZABETH', body: 'f', role: 'H', st: { spd: 32, cut: 52, hgt: 28, ctch: 72, acc: 88, pow: 31, rea: 48, iq: 70, sta: 40 }, look: { hair: 'red', hs: 'v1', skin: 'fair', shoes: 'white', acc: 'crown' }, sp: { bhT: 'scoober', bhD: 'air' }, traits: ['careful', 'pressure'] },
+      6: { name: 'ニュートン', en: 'NEWTON', role: 'D', st: { spd: 53, cut: 29, hgt: 88, ctch: 67, acc: 51, pow: 69, rea: 47, iq: 74, sta: 45 }, look: { hair: 'white', hs: 'long', skin: 'fair', shoes: 'black', acc: 'glasses' }, sp: { C: 'heli' }, traits: ['sky'] },
+      8: { name: 'コロンブス', en: 'COLUMBUS', role: 'C', st: { spd: 89, cut: 72, hgt: 54, ctch: 46, acc: 34, pow: 69, rea: 46, iq: 30, sta: 75 }, look: { hair: 'brown', hs: 'm1', skin: 'light', shoes: 'brown', acc: 'captain' }, traits: ['bold', 'moody'] },
+      10: { name: 'マルコ・ポーロ', en: 'MARCO POLO', role: 'C', st: { spd: 66, cut: 89, hgt: 32, ctch: 54, acc: 48, pow: 53, rea: 91, iq: 49, sta: 90 }, look: { hair: 'brown', hs: 'm2', skin: 'medium', shoes: 'brown', acc: 'traveler' }, traits: ['diver', 'tough'] },
+      13: { name: '卑弥呼', en: 'HIMIKO', body: 'f', role: 'H', st: { spd: 40, cut: 60, hgt: 28, ctch: 60, acc: 82, pow: 34, rea: 62, iq: 85, sta: 55 }, look: { hair: 'black', hs: 'v4', skin: 'light', shoes: 'white', acc: 'goldband' }, traits: ['faker'] },   // 控え
+      15: { name: 'スパルタクス', en: 'SPARTACUS', role: 'C', st: { spd: 82, cut: 74, hgt: 50, ctch: 52, acc: 36, pow: 72, rea: 62, iq: 40, sta: 85 }, look: { hair: 'brown', hs: 'buzz', skin: 'tan', shoes: 'brown', acc: 'wristband' }, traits: ['diver'] },   // 控え
+      18: { name: 'ピョートル大帝', en: 'PETER', body: 'l', role: 'D', st: { spd: 56, cut: 30, hgt: 95, ctch: 62, acc: 46, pow: 80, rea: 42, iq: 60, sta: 58 }, look: { hair: 'brown', hs: 'slick', skin: 'fair', shoes: 'black', acc: 'captain' }, traits: ['sky'] },   // 控え
+      12: { name: '始皇帝', en: 'SHI HUANGDI', body: 'l', role: 'D', st: { spd: 70, cut: 47, hgt: 71, ctch: 66, acc: 54, pow: 87, rea: 49, iq: 54, sta: 60 }, look: { hair: 'black', hs: 'topknot', skin: 'light', shoes: 'black', acc: 'mianguan' }, sp: { fhT: 'highfore' }, traits: ['streaky', 'mood'] },
+    },
+];
+// 最初の先発7人と控え3人（[青, 赤]）。先発の並び順は、プルで並ぶ順など
+window.UFPS_TEAM_DEFAULT = { starters: [[7, 11, 3, 23, 9, 14, 5], [1, 2, 4, 6, 8, 10, 12]], bench: [[17, 21, 33], [13, 15, 18]] };
+
+// 前の青チーム（偉人）。2026-11-20 主人公チームをオリジナルにしたので使っていない。あとで「偉人チーム」として相手に出すときのために残す
+window.UFPS_ROSTER_LEGENDS_BLUE = {
+      7: { name: 'ナポレオン', en: 'NAPOLEON', role: 'H', st: { spd: 50, cut: 92, hgt: 34, ctch: 46, acc: 73, pow: 49, rea: 72, iq: 86, sta: 55 }, look: { hair: 'black', hs: 'm1', skin: 'light', shoes: 'black', acc: 'bicorne' }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['clutch'] },
+      11: { name: 'ダ・ヴィンチ', en: 'DA VINCI', role: 'H', st: { spd: 50, cut: 67, hgt: 52, ctch: 46, acc: 92, pow: 51, rea: 68, iq: 92, sta: 45 }, look: { hair: 'white', hs: 'long', skin: 'light', shoes: 'brown', acc: 'beret' }, sp: { bhD: 'air', fhD: 'air', C: 'heli' }, traits: ['faker'] },
+      3: { name: 'クレオパトラ', en: 'CLEOPATRA', body: 'f', role: 'H', st: { spd: 31, cut: 53, hgt: 30, ctch: 69, acc: 94, pow: 30, rea: 47, iq: 71, sta: 40 }, look: { hair: 'black', hs: 'v2', skin: 'tan', shoes: 'gold', acc: 'goldband' }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['careful', 'streaky'] },
+      23: { name: 'アレクサンドロス', en: 'ALEXANDER', body: 'l', role: 'D', st: { spd: 73, cut: 54, hgt: 69, ctch: 73, acc: 46, pow: 90, rea: 46, iq: 47, sta: 70 }, look: { hair: 'blond', hs: 'm2', skin: 'medium', shoes: 'white', acc: 'goldband' }, sp: { fhT: 'highfore' }, traits: ['sky'] },
+      9: { name: 'ジャンヌ', en: 'JEANNE', body: 'f', role: 'C', st: { spd: 74, cut: 88, hgt: 28, ctch: 51, acc: 48, pow: 48, rea: 94, iq: 49, sta: 88 }, look: { hair: 'brown', hs: 'v3', skin: 'fair', shoes: 'silver', acc: 'wristband' }, traits: ['tough', 'mood'] },
+      14: { name: 'チンギス', en: 'GENGHIS', role: 'C', st: { spd: 91, cut: 72, hgt: 51, ctch: 46, acc: 27, pow: 72, rea: 50, iq: 32, sta: 80 }, look: { hair: 'black', hs: 'buzz', skin: 'medium', shoes: 'brown', acc: 'furhat' }, traits: ['bold', 'diver'] },
+      17: { name: 'キュリー', en: 'CURIE', body: 'f', role: 'H', st: { spd: 38, cut: 55, hgt: 30, ctch: 62, acc: 84, pow: 36, rea: 55, iq: 90, sta: 60 }, look: { hair: 'brown', hs: 'bun', skin: 'fair', shoes: 'black', acc: 'wristband' }, traits: ['careful'] },   // 控え
+      21: { name: '織田信長', en: 'NOBUNAGA', role: 'C', st: { spd: 80, cut: 70, hgt: 42, ctch: 50, acc: 40, pow: 58, rea: 70, iq: 60, sta: 72 }, look: { hair: 'black', hs: 'topknot', skin: 'light', shoes: 'black', acc: 'whiteband' }, traits: ['bold'] },   // 控え
+      33: { name: 'リンカーン', en: 'LINCOLN', role: 'D', st: { spd: 55, cut: 35, hgt: 90, ctch: 66, acc: 50, pow: 60, rea: 45, iq: 72, sta: 62 }, look: { hair: 'black', hs: 'short', skin: 'light', shoes: 'black', acc: 'none' }, traits: ['tough'] },   // 控え
+      5: { name: 'ガリレオ', en: 'GALILEO', role: 'D', st: { spd: 49, cut: 26, hgt: 86, ctch: 74, acc: 48, pow: 70, rea: 48, iq: 69, sta: 45 }, look: { hair: 'brown', hs: 'slick', skin: 'light', shoes: 'black', acc: 'glasses' }, sp: { C: 'heli' }, traits: ['slow'] },
+};
+
+</script>
+<script>
+/* ============================================================
+ * ユニフォーム（シャツ・ゲームパンツ）を描く。2026-11-20 林さん「チーム画面で選べる」「ゲームパンツも作成して」
+ *   設計: 20261120_ユニフォームの設計メモ_v2.md（リサーチ: 全面プリント・番号は詰まった太字＋縁取り1本・名前は背番号の上）
+ *   ・シャツの元の画像（VRoid のTシャツ。上半分＝前、下半分＝後ろ）のしわの陰を残して、柄・番号・名前を塗る
+ *   ・柄: pins（グラデーション＋細い斜線）／ side（サイドパネル）／ topo（等高線）
+ *   ・色: PALETTE（チームの色ごとに 基本・明るい・濃い・差し色・数字・縁取り・パンツ）
+ *   ・文字: assets/uniform/font_atlas.png（英大文字・数字を画像にしたもの。tools/make_uniform_assets.py で作る）
+ *   ・パンツの画像: 横に並んだ帯で、前＝真ん中（x 128〜384、真ん中が前の縫い目）、わき＝x 128 と 384 のあたり、後ろ＝両端
+ *   使い方: Uniform.ready.then(...)。Uniform.jersey(元の画像, キット, 番号, 名前) → canvas。Uniform.pants(元の画像, キット, 番号) → canvas
+ *           キット = { design, pal（PALETTE の1つ）, chest（胸の英字。空なら番号だけ） }
+ * ============================================================ */
+(function () {
+  const PALETTE = {
+    blue: { main: [36, 96, 235], light: [120, 170, 255], dark: [12, 26, 78], accent: [255, 214, 64], num: [255, 255, 255], key: [12, 26, 78], pants: [16, 26, 64] },
+    purple: { main: [124, 62, 215], light: [190, 150, 255], dark: [38, 16, 78], accent: [255, 214, 64], num: [255, 255, 255], key: [38, 16, 78], pants: [34, 16, 66] },
+    sky: { main: [34, 178, 224], light: [160, 232, 250], dark: [10, 48, 90], accent: [255, 255, 255], num: [10, 40, 80], key: [255, 255, 255], pants: [12, 40, 76] },
+    yellow: { main: [246, 200, 30], light: [255, 236, 140], dark: [34, 34, 40], accent: [34, 34, 40], num: [28, 28, 34], key: [255, 255, 255], pants: [30, 30, 36] },
+    white: { main: [240, 242, 246], light: [255, 255, 255], dark: [77, 78, 82], accent: [40, 100, 235], num: [24, 24, 30], key: [255, 255, 255], pants: [77, 78, 82], deep: [22, 34, 78], gold: [196, 156, 62], ivory: [247, 245, 239] },   // 白（2026-11-20。あなたのチームの初めの色）
+    black: { main: [44, 44, 52], light: [100, 100, 112], dark: [12, 12, 16], accent: [255, 214, 64], num: [255, 255, 255], key: [12, 12, 16], pants: [16, 16, 20] },
+    red: { main: [214, 40, 40], light: [255, 120, 110], dark: [40, 12, 16], accent: [255, 255, 255], num: [255, 255, 255], key: [40, 12, 16], pants: [24, 10, 12] },   // 相手
+  };
+  const DESIGNS = { prestige: '上品', pr_navy: '上品・紺', pr_gold: '上品・金', pr_sky: '上品・水色', pr_hem: '上品・上下', pr_pin: '上品・ストライプ', band: '胸の帯', sleeve: '袖グラデ', wave: '光の波', crest: 'クラシック', cr_ivory: 'クラシック・白地', cr_blue: 'クラシック・青の線', cr_sleeve: 'クラシック・袖の線', cr_chest: 'クラシック・胸の線', cr_panel: 'クラシック・紺のパネル', pins: 'グラデーション', side: 'サイドパネル', topo: '等高線' };
+  // 上品の派生（2026-11-20）: sh 肩の色 / lat 格子の色（null で無し）/ latA 格子の濃さ / pinW・pinA ピンストライプの太さ・濃さ / hem すそからもグラデーション
+  const PRV = {
+    prestige: { sh: 'accent', lat: [212, 214, 222], latA: 0.45, pinW: 1.4, pinA: 0.32 },
+    pr_navy: { sh: 'deep', lat: [212, 214, 222], latA: 0.45, pinW: 1.4, pinA: 0.32 },
+    pr_gold: { sh: 'gold', lat: [214, 196, 150], latA: 0.4, pinW: 1.4, pinA: 0.32 },
+    pr_sky: { sh: 'sky', lat: [176, 208, 236], latA: 0.45, pinW: 1.4, pinA: 0.28 },
+    pr_hem: { sh: 'accent', lat: [212, 214, 222], latA: 0.45, pinW: 1.4, pinA: 0.32, hem: true },
+    pr_pin: { sh: 'accent', lat: null, latA: 0, pinW: 2.2, pinA: 0.7 },
+  };
+  const WHITE_SET = new Set(['cr_ivory', 'cr_blue', 'cr_sleeve', 'cr_chest', 'cr_panel', 'prestige', 'pr_navy', 'pr_gold', 'pr_sky', 'pr_hem', 'pr_pin', 'band', 'sleeve', 'wave', 'crest']);   // 白の上品な候補（細部とパンツを紺と金にする）
+  const BODY_X = [117, 395], FRONT_Y = [88, 422], BACK_Y = [598, 936], CX = 256;
+
+  // 素材を読む（相対パス。試合とホームで同じ場所）
+  const img = (src) => new Promise((ok, ng) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ng; i.src = src; });
+  let atlas = null, meta = null, shirtBase = null, isReady = false;
+  const ready = Promise.all([img('assets/uniform/font_atlas.png'), fetch('assets/uniform/font_atlas.json').then((r) => r.json()), img('assets/uniform/shirt_base.png')])
+    .then(([a, m, s]) => { atlas = a; meta = m; shirtBase = s; isReady = true; })
+    .catch((e) => { console.warn('ユニフォームの素材を読めない', e); });
+
+  const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const rgb = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+  function pixels(src) { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; const g = c.getContext('2d'); g.drawImage(src, 0, 0); return { c, g, d: g.getImageData(0, 0, c.width, c.height) }; }
+
+  // ---- シャツの画像の形（2026-11-20）: 列ごとの上端・下端（前・後ろ）、行ごとの左右のはし ----
+  const GEOM = new WeakMap();
+  function geom(base, px, W, H) {
+    if (GEOM.has(base)) return GEOM.get(base);
+    const topF = new Int16Array(W).fill(-1), topB = new Int16Array(W).fill(-1), botF = new Int16Array(W).fill(-1), botB = new Int16Array(W).fill(-1), lE = new Int16Array(H).fill(-1), rE = new Int16Array(H).fill(-1);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (px[(y * W + x) * 4 + 3] <= 128) continue;
+      if (y < H / 2) { if (topF[x] < 0) topF[x] = y; botF[x] = y; } else { if (topB[x] < 0) topB[x] = y; botB[x] = y; }
+      if (lE[y] < 0) lE[y] = x; rE[y] = x;
+    }
+    const G = { topF, topB, botF, botB, lE, rE }; GEOM.set(base, G); return G;
+  }
+  // オリジナルの紋章（盾＋頭文字＋ディスクの弧）。(cx, cy) 中心、h 高さ [px]
+  function emblem(g, cx, cy, h, P, letter) {
+    const w = h * 0.84, path = () => { g.beginPath(); g.moveTo(cx - w / 2, cy - h / 2); g.lineTo(cx + w / 2, cy - h / 2); g.lineTo(cx + w / 2, cy + h * 0.08);
+      g.quadraticCurveTo(cx + w / 2, cy + h * 0.36, cx, cy + h / 2); g.quadraticCurveTo(cx - w / 2, cy + h * 0.36, cx - w / 2, cy + h * 0.08); g.closePath(); };
+    path(); g.fillStyle = rgb(P.accent); g.fill();
+    g.save(); g.translate(cx, cy); g.scale(0.84, 0.86); g.translate(-cx, -cy); path(); g.fillStyle = rgb(P.dark); g.fill(); g.restore();
+    g.strokeStyle = rgb(P.accent); g.lineWidth = Math.max(1.5, h * 0.06); g.beginPath(); g.ellipse(cx, cy - h * 0.2, w * 0.3, h * 0.08, -0.25, Math.PI * 0.1, Math.PI * 1.15); g.stroke();   // ディスクの弧
+    if (isReady && letter) drawText(g, letter, cx, cy + h * 0.06, h * 0.36, w * 0.6, P.num, P.dark, 0);
+  }
+  // ---- シャツの柄（チームごとに1回だけ描いて、選手ごとに写して文字を足す） ----
+  const patCache = new WeakMap();   // 元の画像 → { 柄と色 → 描いた柄 }
+  function pattern(base, kit) {
+    if (!patCache.has(base)) patCache.set(base, new Map());
+    const cache = patCache.get(base), key = kit.design + '|' + JSON.stringify(kit.pal);
+    if (cache.has(key)) return cache.get(key);
+    const { c, g, d } = pixels(base), px = d.data, W = c.width, H = c.height, P = kit.pal, px0 = new Uint8ClampedArray(px);
+    let lmax = 1; for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) lmax = Math.max(lmax, px[i]);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4; if (px[i + 3] <= 128) continue;
+      const shade = 0.55 + 0.45 * ((px[i] + px[i + 1] + px[i + 2]) / 3) / lmax;
+      const front = y < H / 2, sleeve = x < BODY_X[0] + 4 || x > BODY_X[1] - 4;
+      const ylp = front ? y - FRONT_Y[0] : y - BACK_Y[0], yl = ylp / (front ? FRONT_Y[1] - FRONT_Y[0] : BACK_Y[1] - BACK_Y[0]);
+      let col;
+      if (kit.design === 'pins') {   // すそへ向かって濃く＋細い斜線。袖は濃い色、袖口に差し色
+        col = mixc(P.main, P.dark, Math.min(1, Math.max(0, yl * 0.9)));
+        if (!sleeve && ((x + y * 0.8) % 22) < 2.2) col = mixc(col, P.light, 0.35);
+        if (sleeve) col = (x < 60 || x > 452) ? P.accent : P.dark;
+      } else if (kit.design === 'side') {   // わき腹から袖へ濃い色の山形。境目に差し色
+        const dx = Math.abs(x - CX), edge = 70 + 0.35 * Math.abs(ylp - 200);
+        col = P.main;
+        if (!sleeve && dx > edge) col = P.dark;
+        if (!sleeve && Math.abs(dx - edge) < 5) col = P.accent;
+        if (sleeve) { const s = x < CX ? 1 : -1, sx = x < CX ? 70 : 442; col = Math.abs((x - sx) * s + (ylp - 90) * 0.7) < 7 ? P.accent : P.dark; }
+      } else if (PRV[kit.design]) {   // 上品（2026-11-20）とその派生: オフホワイト＋トーナルの格子＋金のピンストライプ＋肩のグラデーション
+        const IV = P.ivory || P.main, DP = P.deep || P.dark, GD = P.gold || P.accent, V = PRV[kit.design];
+        const SH = V.sh === 'deep' ? DP : V.sh === 'gold' ? GD : V.sh === 'sky' ? [120, 190, 245] : P.accent;   // 肩の色
+        col = IV;
+        const lat = V.lat && (((x + y) % 30 + 30) % 30 < 1.3 || ((x - y) % 30 + 30) % 30 < 1.3);   // ひし形の格子
+        if (lat) col = mixc(col, V.lat, V.latA);
+        const dxp = Math.abs(x - CX);
+        if (!sleeve && dxp > 100) col = mixc(col, [222, 224, 232], 0.55);                 // わき腹のパネル
+        if (!sleeve && dxp <= 96 && ((x - CX) % 24 + 24) % 24 < V.pinW) col = mixc(col, GD, V.pinA);   // 金のピンストライプ
+        const Gp = geom(base, px0, W, H), dT = y - (front ? Gp.topF[x] : Gp.topB[x]);
+        if (dT >= 0 && dT < 58) { const t = dT / 58; col = mixc(SH, col, t * t * (3 - 2 * t)); }   // 肩のグラデーション（色 → 白）
+        if (dT >= 58 && dT < 61) col = V.sh === 'gold' ? DP : GD;                       // 境目の線（金の肩のときは紺）
+        if (V.hem && !sleeve) { const dB = (front ? Gp.botF[x] : Gp.botB[x]) - y;      // すそからのグラデーション
+          if (dB >= 15 && dB < 75) { const t = (dB - 15) / 60; col = mixc(SH, col, t * t * (3 - 2 * t)); }
+          if (dB >= 75 && dB < 78) col = GD; }
+      } else if (kit.design === 'band') {   // 胸の帯: 胸に青の横帯（上下に金の線）＋細かいトーナルの縦じま
+        const IV = P.ivory || P.main, GD = P.gold || P.accent;
+        col = ((x % 10) < 1) ? mixc(IV, [214, 216, 224], 0.5) : IV;
+        const yb = front ? y - FRONT_Y[0] : y - BACK_Y[0], b0 = front ? 98 : 40, b1 = front ? 140 : 84;   // 帯の上下（前はチーム名、後ろは名前の所）
+        if (yb >= b0 && yb < b1) col = mixc(P.accent, P.deep || P.dark, (yb - b0) / (b1 - b0) * 0.35);
+        if ((yb >= b0 - 5 && yb < b0 - 2) || (yb >= b1 + 2 && yb < b1 + 5)) col = GD;
+      } else if (kit.design === 'sleeve') {   // 袖グラデ: 白の胴＋うすい横じま、袖が青 → 紺、わきに金の2本線
+        const IV = P.ivory || P.main, GD = P.gold || P.accent;
+        col = ((y % 12) < 1.2) ? mixc(IV, [218, 220, 228], 0.5) : IV;
+        if (sleeve) { const de = x < CX ? 117 - x : x - 395; col = mixc(P.accent, P.deep || P.dark, Math.max(0, Math.min(1, de / 90))); }
+        const dxs = Math.abs(x - CX); if (!sleeve && ((dxs > 120 && dxs < 123) || (dxs > 127 && dxs < 130))) col = GD;
+      } else if (kit.design === 'wave') {   // 光の波: うすい青の大きな波（2重）＋金の細い波線
+        const IV = P.ivory || P.main, GD = P.gold || P.accent;
+        col = IV;
+        const xn = (x - 117) / 278, yn = front ? (y - FRONT_Y[0]) / 334 : (y - BACK_Y[0]) / 334, xs = front ? xn : 1 - xn;
+        const w1 = 0.82 - xs * 0.55 + Math.sin(xs * 5.2) * 0.07, w2 = w1 + 0.12;
+        if (yn > w1) col = mixc(col, mixc(P.accent, [255, 255, 255], 0.55), Math.min(1, (yn - w1) * 6) * 0.85);
+        if (yn > w2) col = mixc(col, P.accent, 0.55);
+        if (Math.abs(yn - (w1 - 0.035)) < 0.006) col = GD;
+        if (sleeve) col = mixc(IV, P.accent, 0.15);
+      } else if (kit.design === 'crest' || kit.design.startsWith('cr_')) {   // クラシック（2026-11-20。紋章のすかしは消した）とその派生
+        const dz = kit.design, GD = P.gold || P.accent, DP = P.deep || P.dark;
+        const CR = dz === 'cr_ivory' ? (P.ivory || P.main) : [243, 238, 226], L1 = dz === 'cr_blue' ? P.accent : DP;   // 地の色・わきの1本目の線の色
+        col = CR;
+        const yb = front ? y - FRONT_Y[0] : y - BACK_Y[0], dxs = Math.abs(x - CX);
+        if (dz === 'cr_panel') { if (!sleeve && dxs > 112) col = DP; if (!sleeve && dxs > 106 && dxs <= 109) col = GD; }   // わき腹の紺のパネル＋金の線
+        else { if (!sleeve && dxs > (dz === 'cr_blue' ? 115 : 118) && dxs < 122) col = L1; if (!sleeve && dxs > 125 && dxs < 128) col = GD; }        // わきの2本線
+        if (dz === 'cr_chest' && !sleeve) { const a = front ? 146 : 80; if (yb >= a && yb < a + 4) col = DP; if (yb >= a + 7 && yb < a + 9) col = GD; }   // 胸（背中）の横線
+        if (dz === 'cr_sleeve' && sleeve && (front ? y < 236 : y < 748)) { const Gs = geom(base, px0, W, H), de = x < CX ? x - Gs.lE[y] : Gs.rE[y] - x;   // 袖の先の2本線
+          if (de >= 20 && de < 25) col = DP; if (de >= 28 && de < 31) col = GD; }
+      } else {   // topo: 等高線をうっすら。肩は濃い色、境目に差し色
+        const xn = x / 512, yn = (front ? y : y - 510) / 512;
+        const v = Math.sin(xn * 7.1 + yn * 3.3) + Math.sin(xn * 2.3 - yn * 6.7 + 1.3) * 0.8 + Math.sin((xn + yn) * 11 + 0.5) * 0.35;
+        const fr = ((v * 4.2) % 1 + 1) % 1;
+        col = Math.abs(fr - 0.5) < 0.045 ? mixc(P.main, P.light, 0.55) : P.main;
+        if (ylp < 40 || sleeve) col = P.dark;
+        if (!sleeve && Math.abs(ylp - 40) < 4) col = P.accent;
+      }
+      // ---- 細部（2026-11-20）----
+      const Gm = geom(base, px0, W, H), dTop = y - (front ? Gm.topF[x] : Gm.topB[x]), dBot = (front ? Gm.botF[x] : Gm.botB[x]) - y;
+      const neck = x > 196 && x < 316;
+      const WS = WHITE_SET.has(kit.design), TD = WS ? (P.deep || P.dark) : P.dark, TA = WS ? (P.gold || P.accent) : P.accent;   // 細部の色（上品は紺と金）
+      if (!sleeve && !WS) { const yl2 = Math.max(0, Math.min(1, yl)), cell = 9, rr = 0.6 + 2.6 * yl2 * yl2, dx = (x % cell) - cell / 2, dy = (y % cell) - cell / 2; if (dx * dx + dy * dy < rr * rr) col = mixc(col, P.light, 0.16); }   // 網点（下ほど大きい）
+      if (neck && dTop < 11) col = dTop >= 8 ? TA : TD;                                             // 襟（リブ＋差し色の線）
+      else if (!neck && dTop >= 0 && dTop < 3 && !WS) col = TA;              // 肩のパイピング（上品はグラデーションがあるので無し）
+      const sleeveRow = front ? y < 236 : y < 748;
+      if (sleeve && sleeveRow) { const de = x < CX ? x - Gm.lE[y] : Gm.rE[y] - x; if (de >= 0 && de < 13) col = de >= 10 ? TA : TD; }   // 袖口
+      if (!sleeve && dBot >= 0 && dBot < 15) col = dBot >= 12 ? TA : TD;                        // すそ
+      px[i] = col[0] * shade; px[i + 1] = col[1] * shade; px[i + 2] = col[2] * shade;
+    }
+    g.putImageData(d, 0, 0);
+    const EP = WHITE_SET.has(kit.design) ? Object.assign({}, P, { accent: P.gold || P.accent, dark: P.deep || P.dark, num: P.gold || P.num }) : P;   // 上品: 紺の盾に金
+    emblem(g, 322, FRONT_Y[0] + 76, 40, EP, ((kit.chest || '').trim()[0] || 'U').toUpperCase());   // 左胸のエンブレム
+    cache.set(key, c);
+    return c;
+  }
+
+  // ---- 文字（英大文字・数字）。縁取りを先に、上に字を重ねる ----
+  const tint = new Map();
+  function tinted(color) {   // 文字の画像を、その色に塗ったもの
+    const k = color.join(); if (tint.has(k)) return tint.get(k);
+    const c = document.createElement('canvas'); c.width = atlas.width; c.height = atlas.height;
+    const g = c.getContext('2d'); g.drawImage(atlas, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = rgb(color); g.fillRect(0, 0, c.width, c.height);
+    tint.set(k, c); return c;
+  }
+  function textW(str, s) { let w = 0; for (const ch of str) w += ch === ' ' ? meta.space * s : meta.glyphs[ch] ? meta.glyphs[ch].adv * s : 0; return w; }
+  // 中心 (cx, cy) に、字の高さ capPx で書く。maxW を超えるなら横に詰める。key 縁取りの太さ [px]
+  function drawText(g, str, cx, cy, capPx, maxW, fill, keyCol, key) {
+    str = (str || '').toUpperCase().replace(/[^A-Z0-9 .\-&']/g, '');
+    if (!str) return;
+    const s = capPx / meta.cap, w = textW(str, s), sx = w > maxW ? maxW / w : 1;
+    const base = cy + capPx / 2;
+    const layer = (img, off) => {
+      let pen = cx - (w * sx) / 2;
+      for (const ch of str) {
+        if (ch === ' ') { pen += meta.space * s * sx; continue; }
+        const q = meta.glyphs[ch]; if (!q) continue;
+        g.drawImage(img, q.x, q.y, q.w, q.h, pen + q.ox * s * sx + off[0], base + q.oy * s + off[1], q.w * s * sx, q.h * s);
+        pen += q.adv * s * sx;
+      }
+    };
+    if (key > 0) { const kimg = tinted(keyCol); for (let a = 0; a < 16; a++) { const t = a / 16 * Math.PI * 2; layer(kimg, [Math.cos(t) * key, Math.sin(t) * key]); } }
+    layer(tinted(fill), [0, 0]);
+  }
+
+  // ---- シャツ: 柄＋前（胸の英字・番号）＋後ろ（名前・背番号） ----
+  function jersey(base, kit, num, name, pc) {   // pc: パーソナルカラー（番号のふち。2026-11-20）
+    const pat = pattern(base, kit), c = document.createElement('canvas'); c.width = pat.width; c.height = pat.height;
+    const g = c.getContext('2d'); g.drawImage(pat, 0, 0);
+    const P0 = kit.pal, P = WHITE_SET.has(kit.design) ? Object.assign({}, P0, { num: P0.deep || P0.num, key: P0.gold || P0.key }) : P0, n = String(num);   // 上品: 紺の番号に金のふち
+    if (kit.chest) drawText(g, kit.chest, CX, FRONT_Y[0] + 118, 30, 210, kit.design === 'band' ? [255, 255, 255] : P.num, kit.design === 'band' ? (P0.deep || P.key) : P.key, 2);
+    drawText(g, n, CX, FRONT_Y[0] + (kit.chest ? 205 : 170), 70, 200, P.num, P.key, 3.5);   // 前の番号（規定: 4インチ以上）
+    drawText(g, name, CX, BACK_Y[0] + 62, 26, 230, kit.design === 'band' ? [255, 255, 255] : P.num, kit.design === 'band' ? (P0.deep || P.key) : P.key, 2);                         // 名前（背番号の上）
+    drawText(g, n, CX, BACK_Y[0] + 188, 142, 240, P.num, P.key, 6);                          // 背番号（規定: 6インチ以上）
+    return c;
+  }
+
+  // ---- ゲームパンツ: 無地（しわの陰だけ残す）＋わきに差し色の線＋腰のゴムは濃い色＋前の左足に番号 ----
+  function pants(base, kit, num, pc) {
+    const P0 = kit.pal, P = WHITE_SET.has(kit.design) ? Object.assign({}, P0, { pants: P0.deep || P0.pants, accent: P0.gold || P0.accent, main: P0.ivory || P0.main, dark: P0.deep || P0.dark, num: P0.gold || P0.num }) : P0;   // 白の候補: 紺に金
+    const { c, g, d } = pixels(base), px = d.data, W = c.width, H = c.height;
+    let hb = 0; const lum = new Float32Array(W * H); let sum = 0, cnt = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 3] > 128) { hb = Math.max(hb, y); const l = (px[i] + px[i + 1] + px[i + 2]) / 3; lum[y * W + x] = l; sum += l; cnt++; } }
+    const avg = sum / Math.max(1, cnt);
+    const bot = new Int16Array(W).fill(-1); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (px[(y * W + x) * 4 + 3] > 128) bot[x] = y;   // 列ごとのすその位置
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4; if (px[i + 3] <= 128) continue;
+      const shade = Math.min(1.12, Math.max(0.78, 0.5 + 0.5 * lum[y * W + x] / avg));   // ボタン・ポケットの絵が目立たないよう、陰は弱めに
+      let col = P.pants;
+      const side = Math.min(Math.abs(x - 128), Math.abs(x - 384));
+      if (side < 9) col = P.accent; else if (side < 13) col = P.main;   // わきの線（差し色＋基本の色の細い縁）
+      if (y < hb * 0.07) col = P.dark;                                     // 腰のゴム
+      else if (y < hb * 0.085) col = P.accent;                             // 腰のゴムの下の細い線（2026-11-20）
+      const db = bot[x] - y; if (db >= 0 && db < 14) col = db >= 11 ? P.accent : P.dark;   // すその帯（2026-11-20）
+      px[i] = col[0] * shade; px[i + 1] = col[1] * shade; px[i + 2] = col[2] * shade;
+    }
+    g.putImageData(d, 0, 0);
+    const cnum = P.pants[0] + P.pants[1] + P.pants[2] < 300 ? [255, 255, 255] : [20, 20, 26];
+    drawText(g, String(num), 322, hb * 0.66, hb * 0.16, 70, cnum, P.pants, 0);
+    emblem(g, 190, hb * 0.66, hb * 0.17, P, ((kit.chest || '').trim()[0] || 'U').toUpperCase());   // 右足の前のエンブレム（2026-11-20）   // 前の左足（規定: 入れるなら前の片足に 2インチ以上）
+    return c;
+  }
+
+  // チーム画面の見本: 前から見たシャツを小さく
+  function preview(design, colorKey, w = 66) {
+    if (!isReady) return null;
+    const kit = { design, pal: PALETTE[colorKey] || PALETTE.blue, chest: '' };
+    const j = jersey(shirtBase, kit, 7, ''), c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * 0.78);
+    c.style.cssText = `display:block;width:${w}px;height:${c.height}px;position:static;`;   // ページの canvas の決まり（画面いっぱい）に巻き込まれないように
+    c.getContext('2d').drawImage(j, 0, 70, 512, 400, 0, 0, c.width, c.height);
+    return c;
+  }
+  window.Uniform = { ready, isReady: () => isReady, jersey, pants, preview, PALETTE, DESIGNS };
+})();
+
+</script>
+<script>
+/* ============================================================
+ * チーム作りの画面（ホームと試合前の両方で使う。2026-11-20 林さん「チーム作り」→ A 先発・C 名前と色／ホームと試合前の両方／保存はしない）
+ *   ・10人から先発7人と控え3人を選ぶ（名前をタップで、先発と控えを1人ずつ入れ替え）
+ *   ・チーム名（点数の表示などに出る）とユニフォームの色
+ *   ・この端末には保存しない。開いている間（sessionStorage）だけ覚えていて、ホーム → 試合 へ持ち越す。アプリを閉じると最初の形に戻る
+ *   使い方: TeamUI.open({ ok: '決定', onDone: (st) => {...} })。今の形は TeamUI.load()
+ *   選手の顔ぶれは roster.js（window.UFPS_ROSTER）
+ * ============================================================ */
+(function () {
+  // 目印の名前（class）は、試合の画面の決まり（.ov＝画面いっぱいの幕 など）とぶつからない名前にする（2026-11-20 林さん「総合60の画面しか映らない」）
+  const KEY = 'ufps_team';
+  // ユニフォームの色（相手の赤と見分けにくい赤・橙・桃は入れない）。ui は 2D の表示（ミニマップ・札）に使う色
+  const COLORS = {
+    blue: { name: '青', top: [40, 105, 255], bottom: [235, 238, 245], ui: '59,108,255' },
+    purple: { name: '紫', top: [140, 70, 230], bottom: [235, 238, 245], ui: '140,80,235' },
+    sky: { name: '水色', top: [40, 190, 230], bottom: [30, 40, 70], ui: '30,170,220' },
+    yellow: { name: '黄', top: [245, 200, 30], bottom: [30, 40, 70], ui: '200,160,20' },
+    white: { name: '白', top: [240, 242, 246], bottom: [77, 78, 82], ui: '40,100,235' },   // 2026-11-20
+    black: { name: '黒', top: [38, 38, 46], bottom: [235, 238, 245], ui: '60,60,75' },
+  };
+  const R = window.UFPS_ROSTER, DEF = window.UFPS_TEAM_DEFAULT;
+  const ROLE = { H: 'ハンドラー', C: 'カッター', D: 'ディープ' };
+  const def = () => ({ name: '', color: 'white', design: 'cr_ivory', starters: DEF.starters[0].slice() });
+  function load() {
+    try {
+      const st = Object.assign(def(), JSON.parse(sessionStorage.getItem(KEY) || '{}'));
+      const all = DEF.starters[0].concat(DEF.bench[0]);
+      if (!Array.isArray(st.starters) || st.starters.length !== 7 || !st.starters.every((n) => all.includes(n))) st.starters = def().starters;
+      if (!COLORS[st.color]) st.color = 'white';
+      if (!['cr_ivory', 'prestige', 'pins', 'side', 'topo'].includes(st.design)) st.design = 'cr_ivory';
+      return st;
+    } catch (e) { return def(); }
+  }
+  function save(st) { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* 覚えられない環境 */ } }
+  const overall = (n) => { const s = R[0][n].st, v = Object.values(s); return Math.round(v.reduce((a, b) => a + b, 0) / v.length); };
+
+  const box = document.createElement('div');
+  box.id = 'teamBox';
+  const css = document.createElement('style');
+  css.textContent = `#teamBox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(8,14,30,.6); font-family: "Meiryo UI", sans-serif; color: #fff; }
+    #teamBox .pn { width: min(760px, 96vw); max-height: 94vh; overflow: auto; background: rgba(20,30,58,.97); border-radius: 14px; padding: 10px 14px; box-sizing: border-box; }
+    #teamBox h3 { margin: 2px 0 6px; font-size: 16px; }
+    #teamBox .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; margin-bottom: 4px; }
+    #teamBox input { font: inherit; font-size: 14px; width: 9.5em; padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; }
+    #teamBox .chip { width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.55); cursor: pointer; padding: 0; }   /* 黒も見えるよう細い白の縁 */
+    #teamBox .chip.on { border-color: #FFE650; }
+    #teamBox .pv { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 5px; border: 2px solid transparent; border-radius: 8px; background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 10px; cursor: pointer; vertical-align: middle; }
+    #teamBox .pv.on { border-color: #FFE650; } #teamBox .pv canvas { display: block; width: 54px !important; height: 42px !important; cursor: pointer; touch-action: auto; }   /* 試合の画面は canvas を全部画面いっぱいにする決まりがあるので、見本の絵は大きさを固定する（2026-11-20 林さん「総合60の画面しか映らない」） */
+    #teamBox .note { margin: 2px 0 4px; font-size: 12px; color: #C7CDFD; }
+    #teamBox .cols { display: flex; gap: 12px; } #teamBox .col { flex: 1; } #teamBox h4 { margin: 2px 0; font-size: 13px; color: #C7CDFD; }
+    #teamBox .row { display: flex; align-items: center; gap: 6px; width: 100%; margin: 2px 0; padding: 3px 8px; border: 2px solid transparent; border-radius: 8px; background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 13px; cursor: pointer; text-align: left; box-sizing: border-box; }
+    #teamBox .row.sel { border-color: #FFE650; background: rgba(255,230,80,.18); } #teamBox .row .nm { font-weight: bold; flex: 1; } #teamBox .row .rl { color: #C7CDFD; font-size: 11px; } #teamBox .row .tov { font-size: 11px; color: #FFE650; min-width: 3.5em; text-align: right; }
+    #teamBox .btns { display: flex; gap: 10px; justify-content: space-between; margin: 6px 0 0; position: sticky; bottom: -10px; padding: 8px 0 10px; background: rgba(20,30,58,.97); }   /* 決定（試合開始）ボタンは、スクロールしなくてもいつも下に見える */
+    #teamBox .btns button { font: inherit; font-size: 14px; color: #fff; border: 0; border-radius: 9px; padding: 8px 18px; background: #7889FB; cursor: pointer; } #teamBox .btns button.sub { background: rgba(255,255,255,.18); }`;
+  function mount() { if (!box.isConnected) { document.head.appendChild(css); document.body.appendChild(box); } }
+
+  function open(opt = {}) {
+    mount();
+    let st = load(), sel = null;
+    const all10 = DEF.starters[0].concat(DEF.bench[0]);
+    const row = (n) => `<button class="row${sel === n ? ' sel' : ''}" data-n="${n}" style="${R[0][n].look && R[0][n].look.pc ? `box-shadow: inset 5px 0 0 rgb(${R[0][n].look.pc.join(',')})` : ''}"><span>#${n}</span><span class="nm">${R[0][n].name}</span><span class="rl">${ROLE[R[0][n].role]}</span><span class="tov">総合 ${overall(n)}</span></button>`;
+    const draw = () => {
+      const bench = all10.filter((n) => !st.starters.includes(n)), cnt = (r) => st.starters.filter((n) => R[0][n].role === r).length;
+      const col = COLORS[st.color];
+      box.innerHTML = `<div class="pn"><h3>チーム</h3>`
+        + `<div class="top"><label>チーム名 <input maxlength="10" placeholder="あなた" value="${st.name.replace(/"/g, '&quot;')}"></label>`
+        + `<span>色 ${Object.entries(COLORS).map(([k, c]) => `<button class="chip${k === st.color ? ' on' : ''}" data-c="${k}" title="${c.name}" style="background:rgb(${c.top.join(',')})"></button>`).join(' ')} ${col.name}</span></div>`
+        + `<div class="top">柄 ${[['cr_ivory', 'クラシック'], ['prestige', '上品'], ['pins', 'グラデーション'], ['side', 'サイドパネル'], ['topo', '等高線']].map(([k, lb]) => `<button class="pv${k === st.design ? ' on' : ''}" data-d="${k}"><span class="cv"></span>${lb}</button>`).join(' ')}<span style="font-size:11px;color:#C7CDFD">チーム名を英字にすると胸に入る</span></div>`
+        + `<p class="note">名前を1人ずつタップすると、先発と控えが入れ替わる　／　いま ハンドラー${cnt('H')}・カッター${cnt('C')}・ディープ${cnt('D')}</p>`
+        + `<div class="cols"><div class="col"><h4>先発7人</h4>${st.starters.map(row).join('')}</div><div class="col"><h4>控え3人</h4>${bench.map(row).join('')}</div></div>`
+        + `<div class="btns"><button class="sub" data-a="reset">最初の形に戻す</button><button data-a="ok">${opt.ok || '決定'}</button></div></div>`;
+      const inp = box.querySelector('input');
+      inp.addEventListener('input', () => { st.name = inp.value.trim(); });
+      inp.addEventListener('keydown', (e) => e.stopPropagation());   // 試合のキー操作に流さない
+      box.querySelectorAll('.pv').forEach((b) => {   // 柄の見本（ユニフォームの素材が読めていれば）
+        const cv = window.Uniform && Uniform.preview(b.dataset.d, st.color, 54); if (cv) b.querySelector('.cv').appendChild(cv);
+        b.addEventListener('click', (e) => { e.stopPropagation(); st.design = b.dataset.d; draw(); });
+      });
+      box.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); st.color = b.dataset.c; draw(); }));
+      box.querySelectorAll('.row').forEach((b) => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const n = +b.dataset.n;
+        if (sel === null || sel === n) sel = sel === n ? null : n;
+        else if (st.starters.includes(sel) !== st.starters.includes(n)) { const out = st.starters.includes(sel) ? sel : n, inn = out === sel ? n : sel; st.starters[st.starters.indexOf(out)] = inn; sel = null; }
+        else sel = n;
+        draw();
+      }));
+      box.querySelector('[data-a=reset]').addEventListener('click', (e) => { e.stopPropagation(); st = def(); sel = null; draw(); });
+      box.querySelector('[data-a=ok]').addEventListener('click', (e) => { e.stopPropagation(); save(st); box.style.display = 'none'; if (opt.onDone) opt.onDone(st); });
+    };
+    draw();
+    box.style.display = 'flex';
+    if (window.Uniform && !Uniform.isReady()) Uniform.ready.then(() => { if (box.style.display === 'flex') draw(); });   // 見本はあとから
+  }
+  window.TeamUI = { open, load, COLORS, isOpen: () => box.style.display === 'flex' };
+})();
+
+</script>
+<script>
+(function () {
+  // 行き先: スマホ確認用・公開版（index.html として置く）は match.html など、このフォルダで直接開くときは 20261117_試合_v2.html など
+  const served = /(^|\/)(index\.html)?$/.test(location.pathname) && !/20261117_/.test(location.pathname);
+  const FILES = served
+    ? { match: 'match.html', game: 'game.html', practice: 'practice.html' }
+    : { match: '20261117_試合_v2.html', game: '20261117_攻撃パート_v1.html', practice: '20261117_投げ練習モード_v2.html' };
+  document.querySelectorAll('[data-go]').forEach((a) => { a.href = FILES[a.dataset.go]; });
+
+  // チームの色と名前を、画面の差し色と右下の表示に
+  function applyTeam() {
+    const st = window.TeamUI ? TeamUI.load() : null;
+    const pal = st && window.Uniform && Uniform.PALETTE[st.color];
+    const ui = pal && (pal.main[0] + pal.main[1] + pal.main[2] > 600 ? pal.accent : pal.main);   // 白いユニフォームのときは差し色（白い字が読めるように）
+    if (pal) { document.documentElement.style.setProperty('--team', `rgb(${ui.join(',')})`); document.documentElement.style.setProperty('--team-d', `rgb(${pal.dark.join(',')})`); }
+    document.getElementById('myTeamName').textContent = (st && st.name) || 'あなた';
+  }
+  applyTeam();
+
+  // 設定（localStorage 'ufps_settings'。試合が読む）
+  const KEY = 'ufps_settings';
+  const DEF = { hand: 'R', cp: 'strong', wind: 'off', sfx: 'big', voice: 'on', sub: 'auto', wrist: '12', nose: 'on', aim: 'on', look: 'on' };
+  const load = () => { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { return Object.assign({}, DEF); } };
+  let st = load();
+  document.querySelectorAll('.seg button').forEach((b) => { b.innerHTML = '<span>' + b.textContent + '</span>'; });   // 斜めの中で文字はまっすぐ
+  function paint() { document.querySelectorAll('.seg').forEach((g) => g.querySelectorAll('button').forEach((b) => b.classList.toggle('on', String(st[g.dataset.key]) === b.dataset.v))); }
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    st[b.parentElement.dataset.key] = b.dataset.v; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* 保存できない環境 */ } paint();
+  }));
+  const settings = document.getElementById('settings');
+  document.getElementById('openSettings').addEventListener('click', () => { st = load(); paint(); settings.style.display = 'flex'; });
+  document.getElementById('closeSettings').addEventListener('click', () => { settings.style.display = 'none'; });
+  document.getElementById('openTeam').addEventListener('click', () => TeamUI.open({ ok: '決定', onDone: applyTeam }));   // チーム作り（試合の前にも出る）
+})();
+</script>
+<script>
+// 通信なしでも遊べるように、中身を覚えさせる係（sw.js）を登録する。https か このPC（localhost）で開いたときだけ動く
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
