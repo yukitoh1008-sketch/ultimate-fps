@@ -1039,8 +1039,8 @@
  *   2026-11-20 match.js から移した */
 window.UFPS_ROSTER = [
     {   // 青（あなたのチーム）。2026-11-20 オリジナルのキャラに（先発7人はタイトルの絵の7人）
-      7: { name: '一ノ瀬 颯', en: 'ICHINOSE', role: 'C', st: { spd: 80, cut: 82, hgt: 50, ctch: 74, acc: 52, pow: 56, rea: 80, iq: 55, sta: 78 }, look: { hair: 'black', hs: 'c7', skin: 'light', shoes: 'black', acc: 'none', pc: [232, 44, 56] }, traits: ['clutch', 'diver'] },   // 主人公。まっすぐで負けず嫌い
-      11: { name: '白銀 玲', en: 'SHIROGANE', role: 'H', st: { spd: 52, cut: 70, hgt: 50, ctch: 50, acc: 90, pow: 52, rea: 66, iq: 84, sta: 52 }, look: { hair: 'silver', hs: 'c11', skin: 'pale', shoes: 'black', acc: 'none', pc: [70, 205, 240] }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['faker'] },   // クールで無口
+      7: { name: '一ノ瀬 颯', en: 'ICHINOSE', role: 'C', st: { spd: 80, cut: 82, hgt: 50, ctch: 74, acc: 52, pow: 56, rea: 80, iq: 55, sta: 78 }, look: { hair: 'black', hs: 'c7v3p', skin: 'light', shoes: 'black', acc: 'none', pc: [232, 44, 56] }, traits: ['clutch', 'diver'] },   // 主人公。まっすぐで負けず嫌い
+      11: { name: '白銀 玲', en: 'SHIROGANE', role: 'H', st: { spd: 52, cut: 70, hgt: 50, ctch: 50, acc: 90, pow: 52, rea: 66, iq: 84, sta: 52 }, look: { hair: 'silver', hs: 'c11v5p', skin: 'pale', face: 'c11v5', tip: 'none', shoes: 'black', acc: 'none', pc: [70, 205, 240] }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['faker'] },   // クールで無口
       3: { name: '春野 千夏', en: 'HARUNO', body: 'f', role: 'H', st: { spd: 52, cut: 60, hgt: 32, ctch: 66, acc: 82, pow: 40, rea: 56, iq: 74, sta: 90 }, look: { hair: 'brown', hs: 'c3', skin: 'light', shoes: 'black', acc: 'none', eye: 'brown', pc: [255, 208, 40] }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['mood'] },   // まとめ役
       23: { name: '獅堂 剛', en: 'SHIDO', body: 'l', role: 'D', st: { spd: 70, cut: 50, hgt: 74, ctch: 72, acc: 44, pow: 88, rea: 48, iq: 45, sta: 70 }, look: { hair: 'blond', hs: 'm5', skin: 'medium', shoes: 'black', acc: 'none', eye: 'gold', pc: [255, 132, 28] }, sp: { fhT: 'highfore' }, traits: ['sky', 'bold'] },   // 熱血
       9: { name: '藍沢 凛', en: 'AIZAWA', body: 'f', role: 'C', st: { spd: 72, cut: 90, hgt: 30, ctch: 52, acc: 48, pow: 46, rea: 88, iq: 52, sta: 86 }, look: { hair: 'navy', hs: 'sY', skin: 'fair', shoes: 'black', acc: 'none', eye: 'blue', face: 'Y', pc: [150, 92, 255] }, traits: ['tough'] },   // 切り返しはチーム一
@@ -1891,10 +1891,10 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       return shape;
     }
     // VRoid で作った髪型（髪だけ取り出したもの）。読み込めたら VHAIR に入る
-    const VHAIR = {}, VHAIR_FALLBACK = { v1: 'long', v2: 'bob', v3: 'short', v4: 'long', v5: 'long', v6: 'pony', m1: 'short', m2: 'fringe', m3: 'fringe', m5: 'fringe', c7: 'fringe', c11: 'short', c5: 'short', c21: 'fringe', c14: 'long', c3: 'pony', sC: 'short', sV: 'short', sX: 'short', sY: 'bob', sZ: 'fringe' };
+    const VHAIR = {}, VHAIR_FALLBACK = { v1: 'long', v2: 'bob', v3: 'short', v4: 'long', v5: 'long', v6: 'pony', m1: 'short', m2: 'fringe', m3: 'fringe', m5: 'fringe', c7: 'fringe', c11: 'short', c7v2: 'fringe', c7v3: 'fringe', c7v3t: 'fringe', c7v3p: 'fringe', c11v2: 'short', c11v3: 'short', c11v3s: 'short', c11v3r: 'short', c11v4: 'short', c11v4r: 'short', c11v4w: 'short', c11v5: 'short', c11v5r: 'short', c11v5u: 'short', c11v5p: 'short', c5: 'short', c21: 'fringe', c14: 'long', c3: 'pony', sC: 'short', sV: 'short', sX: 'short', sY: 'bob', sZ: 'fringe' };
     (async () => {
-      const LIST = [['v1', 'vroid_hair1'], ['v2', 'vroid_hair2'], ['v3', 'vroid_hair3'], ['v4', 'vroid_hair4'], ['v5', 'vroid_hair5'], ['v6', 'vroid_hair6'], ['m1', 'vroid_hair_m1'], ['m2', 'vroid_hair_m2'], ['m3', 'vroid_hair_m3'], ['m5', 'vroid_hair_m5'], ['c7', 'vroid_hair_c7'], ['c11', 'vroid_hair_c11'], ['c5', 'vroid_hair_c5'], ['c21', 'vroid_hair_c21'], ['c14', 'vroid_hair_c14'], ['c3', 'vroid_hair_c3'], ['sC', 'vroid_hair_sC'], ['sV', 'vroid_hair_sV'], ['sX', 'vroid_hair_sX'], ['sY', 'vroid_hair_sY'], ['sZ', 'vroid_hair_sZ'],
-        ['fC', '../face/face_C'], ['fV', '../face/face_V'], ['fX', '../face/face_X'], ['fY', '../face/face_Y'], ['fZ', '../face/face_Z'], ['gV', '../face/glasses_V']];   // f＝顔・g＝メガネ（サンプルアバター）
+      const LIST = [['v1', 'vroid_hair1'], ['v2', 'vroid_hair2'], ['v3', 'vroid_hair3'], ['v4', 'vroid_hair4'], ['v5', 'vroid_hair5'], ['v6', 'vroid_hair6'], ['m1', 'vroid_hair_m1'], ['m2', 'vroid_hair_m2'], ['m3', 'vroid_hair_m3'], ['m5', 'vroid_hair_m5'], ['c7', 'vroid_hair_c7'], ['c11', 'vroid_hair_c11'], ['c7v2', 'vroid_hair_c7v2'], ['c7v3', 'vroid_hair_c7v3'], ['c7v3t', 'vroid_hair_c7v3t'], ['c7v3p', 'vroid_hair_c7v3p'], ['c11v2', 'vroid_hair_c11v2'], ['c11v3', 'vroid_hair_c11v3'], ['c11v3s', 'vroid_hair_c11v3s'], ['c11v3r', 'vroid_hair_c11v3r'], ['c11v4', 'vroid_hair_c11v4'], ['c11v4r', 'vroid_hair_c11v4r'], ['c11v4w', 'vroid_hair_c11v4w'], ['c11v5', 'vroid_hair_c11v5'], ['c11v5r', 'vroid_hair_c11v5r'], ['c11v5u', 'vroid_hair_c11v5u'], ['c11v5p', 'vroid_hair_c11v5p'], ['c5', 'vroid_hair_c5'], ['c21', 'vroid_hair_c21'], ['c14', 'vroid_hair_c14'], ['c3', 'vroid_hair_c3'], ['sC', 'vroid_hair_sC'], ['sV', 'vroid_hair_sV'], ['sX', 'vroid_hair_sX'], ['sY', 'vroid_hair_sY'], ['sZ', 'vroid_hair_sZ'],
+        ['fC', '../face/face_C'], ['fV', '../face/face_V'], ['fX', '../face/face_X'], ['fY', '../face/face_Y'], ['fZ', '../face/face_Z'], ['fc11', '../face/face_c11'], ['fc11v5', '../face/face_c11v5'], ['gV', '../face/glasses_V']];   // f＝顔・g＝メガネ（サンプルアバター）
       const loads = LIST.map(([key, file]) => new Promise((res) => new GLTFLoader().load('assets/hair/' + file + '.glb', (g) => {
         const parts = []; g.scene.traverse((o) => { if (o.isMesh) parts.push({ geo: o.geometry, map: o.material.map, name: o.material.name, mat: o.material }); });   // 部品ごと（色の画像も部品ごと）
         if (parts.length) VHAIR[key] = { parts, topY: (g.parser.json.extras || {}).headTopY || 0.2 };
@@ -2174,7 +2174,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
           if (head) {
             obj.updateMatrixWorld(true);
             const hm = /^s_/.test(lk.hs) ? strandHair(lk.hs, LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head))   // 毛束で作った髪型
-              : /^([vm]\d|s[A-Z]|c\d+)$/.test(lk.hs) ? (vroidHair(lk.hs, LC.hair[lk.hair], head, top, obj, headShape((pl.r && pl.r.body) || 'm', obj, head), lk.pc) || hairMesh(VHAIR_FALLBACK[lk.hs], LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head)))   // VRoid の髪型（まだ読めていなければ、近い髪型で代わり）
+              : /^([vm]\d|s[A-Z]|c\d+(v\d+[a-z]?)?)$/.test(lk.hs) ? (vroidHair(lk.hs, LC.hair[lk.hair], head, top, obj, headShape((pl.r && pl.r.body) || 'm', obj, head), lk.tip === 'none' ? LC.hair[lk.hair] : lk.pc) || hairMesh(VHAIR_FALLBACK[lk.hs], LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head)))   // VRoid の髪型（まだ読めていなければ、近い髪型で代わり）
               : hairMesh(lk.hs, LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head));
             if (hm) { head.add(hm); hm.traverse((o) => { if (o.isMesh) mats.push(o.material); }); }
           }
@@ -2362,7 +2362,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       const wantPitch = Math.max(-0.12, Math.min(0.12, accel * 0.015)) * (fwd >= 0 ? 1 : 0);
       v.bank += (wantBank - v.bank) * Math.min(1, dt * 5);
       v.pitch += (wantPitch - v.pitch) * Math.min(1, dt * 6);
-      v.rig.position.copy(W3(p[0], p[1], 0));
+      v.rig.position.copy(W3(p[0], p[1], s.jz || 0));   // ジャンプ中は持ち上げる
       if (s.scale) v.rig.scale.setScalar(s.scale);   // 背の高さ（選手ごと）
       v.rig.rotation.set(0, toRotY(v.yaw), 0);
       v.obj.rotation.set(0, 0, 0);
@@ -2372,10 +2372,71 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
         _ax.set(1, 0, 0).applyQuaternion(v.rig.quaternion);
         addWorldRot(v.spine, _ax, v.pitch);
       }
+      v.armW = (v.armW || 0) + ((s.armsUp || 0) - (v.armW || 0)) * Math.min(1, dt * 14);   // 両手を上げる強さ（なめらかに上げ下げ）
+      if (v.armW > 0.01) blockPose(v, s, v.armW);
       if (s.hasDisc) recordPivot(pl, v);
       v.palmW = (v.palmW || 0) + ((s.hasDisc ? 1 : 0) - (v.palmW || 0)) * Math.min(1, dt * 6);   // 手のひらの向き直しも少しずつ
       if (v.palmW > 0.01) palmUp(v, v.palmW);
       smoothUpper(v, dt);
+    }
+    // 両手を上げる（ジャンプしてブロックするマーク。2026-11-21）: 上腕と前腕を、まっすぐ上から少し外へ開いた向きへ回す。w: 0〜1
+    const _ua = new THREE.Vector3(), _ub = new THREE.Vector3(), _uc = new THREE.Vector3(), _ud = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
+    function aimBone(b, c, dir, w) {   // 骨 b を、子の骨 c へ向かう向きが dir になるように回す（w の分だけ）
+      b.getWorldPosition(_ua); c.getWorldPosition(_ub); _uc.subVectors(_ub, _ua).normalize();
+      _qa.setFromUnitVectors(_uc, dir); _qb.identity().slerp(_qa, w);
+      b.getWorldQuaternion(_qa); _qa.premultiply(_qb);
+      b.parent.getWorldQuaternion(_qb); b.quaternion.copy(_qb.invert().multiply(_qa)); b.updateMatrixWorld(true);
+    }
+    function raiseArms(v, w) {
+      if (!v.raise) { v.raise = {}; v.obj.traverse((o) => { const mm = /(LeftArm|LeftForeArm|LeftHand|RightArm|RightForeArm|RightHand)$/.exec(o.name); if (mm && o.isBone) v.raise[mm[1]] = o; }); }
+      const B = v.raise; if (!B.LeftArm || !B.RightArm || !B.LeftForeArm || !B.RightForeArm || !B.LeftHand || !B.RightHand) return;
+      v.rig.updateMatrixWorld(true);
+      B.LeftArm.getWorldPosition(_ua); B.RightArm.getWorldPosition(_ub); _ud.subVectors(_ua, _ub).normalize();   // 体の左向き
+      for (const [S, sg] of [['Left', 1], ['Right', -1]]) {
+        const dir = new THREE.Vector3(0, 1, 0).addScaledVector(_ud, sg * 0.22).normalize();   // 真上から少し外へ
+        aimBone(B[S + 'Arm'], B[S + 'ForeArm'], dir, w);
+        aimBone(B[S + 'ForeArm'], B[S + 'Hand'], dir, w);   // ひじを伸ばす
+      }
+    }
+    // バスケのブロック（2026-11-21）: w は構えの強さ（0〜1）、s.jumpT は跳んでからの秒、s.jumpDur は滞空の秒
+    const _bl = new THREE.Vector3(), _bf = new THREE.Vector3(), _bu = new THREE.Vector3(0, 1, 0), _bt = new THREE.Vector3();
+    const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    function blockPose(v, s, w) {
+      if (!v.raise) { v.raise = {}; v.obj.traverse((o) => { const mm = /(LeftArm|LeftForeArm|LeftHand|RightArm|RightForeArm|RightHand|LeftUpLeg|LeftLeg|LeftFoot|RightUpLeg|RightLeg|RightFoot|Spine|Neck)$/.exec(o.name); if (mm && o.isBone) v.raise[mm[1]] = o; }); }
+      const B = v.raise; if (!B.LeftArm || !B.RightArm || !B.LeftForeArm || !B.RightForeArm || !B.LeftHand || !B.RightHand) return;
+      const t = s.jumpT >= 0 ? s.jumpT : 0, D = s.jumpDur || 0.6, k = t / D;   // k: 滞空の中での進み（0＝踏み切り、0.5＝最高点、1＝着地）
+      v.rig.updateMatrixWorld(true);
+      B.LeftArm.getWorldPosition(_ua); B.RightArm.getWorldPosition(_ub); _bl.subVectors(_ua, _ub).normalize();   // 体の左向き
+      _bf.crossVectors(_bl, _bu).normalize();   // 体の前向き
+      // はたく手は利き手（2026-11-21 林さん「ブロックは利き手だけあげて」）
+      const sg = s.hand === 'L' ? 1 : -1, H = sg > 0 ? 'Left' : 'Right', O = sg > 0 ? 'Right' : 'Left';
+      // 体: 少し前へ倒し、はたく手の側へ伸び上がる（最高点で最大）
+      const air = Math.sin(Math.PI * Math.max(0, Math.min(1, k)));
+      if (B.Spine && B.Neck) {   // 背すじ: 空中ではほぼまっすぐ立て（少し前・はたく手の側へ）、地面ではもとの構え
+        const sp = new THREE.Vector3().copy(_bu).addScaledVector(_bf, 0.18).addScaledVector(_bl, sg * 0.12).normalize();
+        aimBone(B.Spine, B.Neck, sp, 0.9 * air * w);
+      }
+      B.LeftArm.getWorldPosition(_ua); B.RightArm.getWorldPosition(_ub); _bl.subVectors(_ua, _ub).normalize(); _bf.crossVectors(_bl, _bu).normalize();   // 背すじを直したので向きを取り直す
+      // はたく手: 上（少し前・少し内側）へ伸ばす。最高点のあと（k 0.5〜0.75）で、前へ振り下ろす
+      const st = s.swatT != null ? s.swatT : -1, swat = st >= 0 && st < 0.7 ? smooth01(st / 0.1) * (1 - smooth01((st - 0.35) / 0.25)) : 0;   // 止めた瞬間から振り下ろす
+      const reach = new THREE.Vector3().copy(_bu).addScaledVector(_bf, 0.22).addScaledVector(_bl, -sg * 0.08).normalize();
+      const down = new THREE.Vector3().copy(_bu).multiplyScalar(0.55).addScaledVector(_bf, 0.85).addScaledVector(_bl, -sg * 0.1).normalize();
+      const upDir = reach.clone().lerp(down, swat * 0.55).normalize(), foreDir = reach.clone().lerp(down, swat).normalize();
+      aimBone(B[H + 'Arm'], B[H + 'ForeArm'], upDir, w);
+      aimBone(B[H + 'ForeArm'], B[H + 'Hand'], foreDir, w);
+      if (swat > 0.01) { addWorldRot(B[H + 'Hand'], _bl, 0.9 * swat * w); B[H + 'Hand'].updateMatrixWorld(true); }   // 手首を返してはたく
+      // 反対の手は上げない（いつもの構えのまま）
+      // 脚: 空中でひざを曲げてたたむ（はたく手と反対側の脚を強め）。地面にいる間（踏み切り前・着地後）は曲げない
+      const tuck = Math.sin(Math.PI * Math.max(0, Math.min(1, (k - 0.05) / 0.9)));
+      if (tuck > 0.01 && B.LeftUpLeg && B.LeftLeg && B.RightUpLeg && B.RightLeg) {
+        for (const [S, a] of [[H, 0.6], [O, 1.0]]) {   // ももはほぼ真下（少し前）、すねは後ろへ（ひざを軽く曲げる）。はたく手と反対の脚を強め
+          if (!B[S + 'Foot']) continue;
+          const th = new THREE.Vector3().copy(_bu).multiplyScalar(-Math.cos(0.3 * a)).addScaledVector(_bf, Math.sin(0.3 * a)).addScaledVector(_bl, (S === 'Left' ? 1 : -1) * 0.06).normalize();
+          const sh = new THREE.Vector3().copy(_bu).multiplyScalar(-Math.cos(0.75 * a)).addScaledVector(_bf, -Math.sin(0.75 * a)).normalize();
+          aimBone(B[S + 'UpLeg'], B[S + 'Leg'], th, tuck * w);
+          aimBone(B[S + 'Leg'], B[S + 'Foot'], sh, tuck * w);
+        }
+      }
     }
     // 持っている人のピボット: 腰から見て、遠い方の足（踏み出した足）がどこにあるか（試合の座標で [横, 縦] m）。
     //   試合側（match.js）がマークの立ち位置をずらすのに使う
@@ -2621,6 +2682,11 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
   const MARK_DIST = 3.0, MARK_ARM = 0.9;
   // マークの手の届きやすさ: 低いディスクほど届きにくい（0.9m以上は必ず届く）。上は手を伸ばして・跳んで 2.8m まで（2.3m より高いほど届きにくい）
   const lowReach = (z) => clamp((z - 0.55) / 0.35, 0, 1) * clamp((2.8 - z) / 0.5, 0, 1);
+  // マークのジャンプ（2026-11-21）: 0.6秒で最高 0.6m。ハンマーは、高さが最高の6割以上のときに通ればブロックできる
+  const JUMP_DUR = 0.6, JUMP_H = 0.6, JUMP_OK = 0.6;
+  const jMax = (pl) => (pl && pl.k && pl.k.jump) || JUMP_H;   // その選手の最高点の高さ [m]（能力「高さ」で変わる）
+  const jDur = (pl) => JUMP_DUR * Math.sqrt(jMax(pl) / JUMP_H);   // 空中にいる時間 [秒]（高く跳ぶほど長い）
+  const jumpH = (pl) => { if (pl.jumpT0 == null) return 0; const t = G.time - pl.jumpT0, D = jDur(pl); return t >= 0 && t <= D ? jMax(pl) * Math.sin(Math.PI * t / D) : 0; };
   // CPの強さ（設定メニューで選ぶ。両チームのCP共通）。2026-11-18 林さん「まだ弱い」→ 既定を「強い」に
   //   D_SPEED 守りの速さ / D_REACT 反応の遅れ / D_LAG 止まっている相手を追う遅れ / D_LEAD 動いている相手の先読み
   //   D_REACH 手の届く範囲 / OPEN_REACH_K 空いた受け手へのパスに届く範囲の倍率 / MARK_FOLLOW ピボットに付いていく割合
@@ -2770,6 +2836,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       k.err = interp([1.5, 1.25, 1, 0.75, 0.5], v('acc', acc)); k.errDeg = interp([1.2, 0.8, 0.5, 0.3, 0.15], v('acc', acc));
       k.pow = 1 + 0.05 * v('pow'); k.layAdd = 0.15 * v('pow'); k.react = -0.025 * v('rea');
       k.iq = v('iq') + 3; k.lag = interp([1.4, 1.2, 1, 0.85, 0.7], v('iq'));   // k.iq は前の★と同じ目盛り（1〜5）
+      k.jump = clamp(JUMP_H + 0.12 * v('hgt') + (hasT(pl, 'sky') ? 0.06 : 0), 0.35, 0.95);   // ジャンプの高さ [m]（2026-11-21）
     }
   }
   // お調子者: 成功すると乗ってくる、ミスすると落ちこむ（次の成功・ミスまで）
@@ -3206,7 +3273,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
     G.openAtThrow = intended ? isOpen(intended) : false;
     const mk0 = markerOf(G.holder);
     G.markSetAtThrow = (mk0 === G.me || mk0 === G.ctl) ? hyp(mk0.p, G.holder.p) < MARK_DIST : hyp(mk0.p, [forceGeom(G.holder).spot[0] + (G.markPiv || 0), forceGeom(G.holder).spot[1]]) < 0.8;
-    G.phase = 'flight'; G.holdTime = 0;
+    G.phase = 'flight'; G.holdTime = 0; G.throwN = (G.throwN || 0) + 1;   // 投げた回数（持つたびの区切り）
     if (G.pulling) { const f = clonedFuture(); G.pullLand = f.land; }
     G.stall = 0; G.charging = false; G.power = 0;
     G.thrower.mode = 'stack';
@@ -3376,6 +3443,12 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
     return true;
   }
   // マークの手が届くコースか: 手を離してから最初の 3m（ブロックできる区間）に、マークが 1.1m 以内にいるか
+  // 赤が青のマークの頭の上をハンマーで越すか（2026-11-21）: 青のマークはジャンプが合わないと止められないので、持つたびに3割の確率で「越す」と決める
+  function overHam(h, o, mk) {
+    if (o.type !== 'hammer' || mk.team !== 0) return false;
+    if (G.hamDareFor !== h || G.hamDareAt !== G.throwN) { G.hamDareFor = h; G.hamDareAt = G.throwN; G.hamDare = Math.random() < 0.3; }
+    return G.hamDare;
+  }
   function markerCanBlock(o, mk) {
     const fx = Math.sin(o.yaw), fy = Math.cos(o.yaw);
     const rx = mk.p[0] - o.foot[0], ry = mk.p[1] - o.foot[1];
@@ -3450,7 +3523,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       const rr2 = planPass(h, cand, G.redHand, (t) => predictPos(pick.r, t), quickSpeed);
       // 賢くない・強気な投げ手は、取られそうなパスでも投げてしまうことがある（慎重な投げ手はしない）
       const skipRisk = !careful && Math.random() < (bold ? 0.25 : 0) + Math.max(0, 3 - h.k.iq) * 0.12;
-      if (rr2 && !markerCanBlock(rr2.o, mk) && (G.holdTime > 7 || skipRisk || !interceptRisk(rr2, pick.r))) { r = rr2; pv = cand; break; }
+      if (rr2 && (!markerCanBlock(rr2.o, mk) || overHam(h, rr2.o, mk)) && (G.holdTime > 7 || skipRisk || !interceptRisk(rr2, pick.r))) { r = rr2; pv = cand; break; }
     }
     if (!r) return false;
     // フェイク上手: 1回だけ投げるふりをして、マークを振ってから投げ直す
@@ -3622,6 +3695,15 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
     SND.play('slide');   // 音: 飛びついて芝を滑る
     ev3d(me, 'dive'); me.diveDir = G.dive.dir;
     me.chase = null;
+  }
+  // 命令: ジャンプ（守備中。跳ぶのは、相手の持っている人・投げた人に付いている青のマーク）
+  function cmdJump() {
+    if (G.poss !== 1 || G.pulling || (G.phase !== 'hold' && G.phase !== 'flight')) return;
+    const mk = markerOf(G.phase === 'hold' ? G.holder : G.thrower);
+    if (!mk || mk.team !== 0 || mk.down > 0 || (G.dive && G.dive.pl === mk)) return;
+    if (mk.jumpT0 != null && G.time - mk.jumpT0 < jDur(mk) + 0.25) return;   // 着地して少し待つまで、次は跳べない（連打できない）
+    mk.jumpT0 = G.time; mk.swatT0 = null; mk.armsUp = 0.9;
+    SND.play('jump');
   }
   // 画面上の向き（右・上）→ 地面の上の向き
   function screenDirToWorld(sx, sy) {
@@ -4737,6 +4819,10 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
     d.w *= 0.4;
     d.blocked = true;
     SND.play('block');   // 音: 手に当たってはじく
+    if (d.type === 'hammer') {   // ハンマーを止めた: バスケのシュートブロックではたく（2026-11-21）
+      if (mk.jumpT0 == null || G.time - mk.jumpT0 > jDur(mk)) mk.jumpT0 = G.time - 0.03;   // 跳んでいない（赤のマーク）→ ここから跳ぶ
+      mk.swatT0 = G.time;
+    }
     const dx = d.p[0] - mk.p[0], dy = d.p[1] - mk.p[1], dl = Math.hypot(dx, dy) || 1;
     mk.p = [mk.p[0] + dx / dl * Math.min(0.3, dl), mk.p[1] + dy / dl * Math.min(0.3, dl)];
     mk.armsUp = 0.9;
@@ -4809,6 +4895,14 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
         else changePossession(marker, '相手のストールアウト！');
       }
       G.aimMate = null;
+      if (G.poss === 0 && !G.pulling) {   // 赤のマーク: 青がハンマーの構え（ピボット＝後ろ）でいる間、投げを読んでときどき跳ぶ（2026-11-21）
+        const rm = markerOf(G.holder);
+        if (rm && rm.team === 1 && curThrow().type === 'hammer' && hyp(rm.p, G.holder.p) < MARK_DIST && !(rm.down > 0)) {
+          G.hamReadT = (G.hamReadT || 0) + dt;
+          const busy = rm.jumpT0 != null && G.time - rm.jumpT0 < jDur(rm) + 0.35;   // 跳んでいる・着地して間もない
+          if (!busy && G.hamReadT > 0.35 && Math.random() < dt * (0.5 + 0.15 * rm.k.iq)) { rm.jumpT0 = G.time; rm.swatT0 = null; rm.armsUp = 0.9; SND.play('jump'); }   // 1秒に0.65〜1.25回くらい
+        } else G.hamReadT = 0;
+      }
       if (G.phase === 'hold' && G.poss === 0 && !IS_TOUCH) {
         const pf = pivotFoot();
         const f = [Math.sin(G.yaw) * Math.cos(G.pitch), Math.cos(G.yaw) * Math.cos(G.pitch), Math.sin(G.pitch)];
@@ -4834,7 +4928,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
             G.aiPend = null;
             const r2 = planPass(pd.h, pd.pv, G.redHand, (t) => predictPos(pd.pick.r, t), quickSpeed) || pd.r;
             // もう振りかぶり終わっているので、待ち時間 0 で確かめる
-            const risky = G.holdTime < 7 && (markerCanBlock(r2.o, markerOf(pd.h)) || interceptRisk(r2, pd.pick.r, 0));
+            const risky = G.holdTime < 7 && ((markerCanBlock(r2.o, markerOf(pd.h)) && !overHam(pd.h, r2.o, markerOf(pd.h))) || interceptRisk(r2, pd.pick.r, 0));
             if (risky) {
               // 振りかぶっている間にコースが消えた → 投げずに止める（投げるふり＝フェイクになる）。受け手はカットを続ける
               pd.pick.r.mode = 'clear'; pd.pick.r.tgt = [pd.pick.r.p[0], pd.pick.r.p[1]]; pd.pick.r.timer = 0.4;
@@ -4868,10 +4962,28 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
         G.predT = 0.15;
       }
       const mk = markerOf(G.thrower);
-      if (!G.pulling && G.markSetAtThrow && !d.blockChecked && d.t < 0.5 && Math.hypot(d.p[0] - mk.p[0], d.p[1] - mk.p[1]) < MARK_ARM && d.p[2] > 0.4 && d.p[2] < 2.8 + mk.k.h) {
+      const hamU = d.type === 'hammer' && mk.team === 0;   // 赤のハンマーを青のマークが止めるのは、ジャンプのタイミングが合ったときだけ（2026-11-21）
+      const inArm = !G.pulling && G.markSetAtThrow && !d.blockChecked && d.t < 0.5 && Math.hypot(d.p[0] - mk.p[0], d.p[1] - mk.p[1]) < MARK_ARM && d.p[2] > 0.4 && d.p[2] < 2.8 + mk.k.h + (d.type === 'hammer' ? jMax(mk) : 0);
+      if (hamU && !d.blockChecked) {
+        const jh = jumpH(mk);
+        if (inArm) {
+          if (!d.hamIn) d.hamT0 = G.time;   // 手の届く所に入った時刻
+          d.hamIn = true;
+          if (jh >= jMax(mk) * JUMP_OK && lowReach(d.p[2] - mk.k.h - jh) > 0) {   // 跳んで高い所にいる間に、手の届く所を通った → ブロック
+            d.blockChecked = true; st().bD++; markHL(`ジャンプでブロック #${mk.n}`);
+            d.blockMsg = `#${mk.n} がジャンプでブロック！`;
+            deflectDisc(d, mk);
+          }
+        } else if (d.hamIn) {   // 手の届く所を通り過ぎた: 止められなかった。跳んだ時刻で「早い」「遅い」を教える
+          d.blockChecked = true;
+          const t = mk.jumpT0 == null ? 99 : d.hamT0 - mk.jumpT0, t0 = jDur(mk) * Math.asin(JUMP_OK) / Math.PI;   // t0: 高さが足りるようになるまでの時間
+          pop(mk, t > 1.2 ? 'ジャンプで止める！' : t < t0 ? 'ジャンプが遅い！' : t > jDur(mk) - t0 ? 'ジャンプが早い！' : '届かない！');
+        }
+      } else if (inArm) {
         d.blockChecked = true; mk.armsUp = 0.8;
         const spE = d.sp && SPX.edge[d.sp], spBlock = spE ? Math.max(0.15, 1 - (1 - spE.block) * d.spF) : 1;   // 特殊スローは止められにくい
-        if (Math.random() < T.BLOCK_P * lowReach(d.p[2] - mk.k.h) * spBlock) {   // 背の高いマークは高い球に届き、低い球には少し届きにくい
+        const hamR = d.type === 'hammer' && mk.team === 1, jr = hamR ? jumpH(mk) : 0;   // 赤のマークもハンマーは跳ばないと止められない（2026-11-21）
+        if ((!hamR || jr >= jMax(mk) * JUMP_OK) && Math.random() < T.BLOCK_P * lowReach(d.p[2] - mk.k.h - jr) * spBlock) {   // 背の高いマークは高い球に届き、低い球には少し届きにくい
           // はじいて、地面に落ちたら攻守交代（下の「地面に落ちた」で、守っていた側が拾う）
           if (mk.team === 0) { st().bD++; markHL(`ブロック #${mk.n}`); }
           d.blockMsg = mk.team === 1 ? `マーク #${mk.n} にブロックされた` : `#${mk.n} がブロック！`;
@@ -5346,6 +5458,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       const bw = 150, bh = 30, x0 = w - bw - 10, y0 = 62;
       list.push({ x: x0, y: y0, w: bw, h: bh, label: G.zone ? '守り方: ゾーン' : '守り方: マンツー', on: false, act: () => { G.zone = !G.zone; if (G.zone) updateZoneAssign(); } });
       list.push({ x: x0, y: y0 + bh + 6, w: bw, h: bh, label: 'フォース: ' + FORCE_LABEL[G.force], on: false, act: () => { const o = ['fh', 'bh', 'mid', 'straight']; G.force = o[(o.indexOf(G.force) + 1) % 4]; } });
+      { const r = 66; list.push({ x: w - r - 12, y: h - r - 18, w: r, h: r, label: 'ジャンプ', on: G.phase === 'hold' || G.phase === 'flight', act: () => cmdJump(), round: true }); }
       if (G.ctl) {
         const r = 66;
         list.push({ x: w - r * 2 - 24, y: h - r - 18, w: r, h: r, label: '切替', on: false, act: () => cmdSwitch(), round: true });
@@ -5542,6 +5655,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
     G.keys[e.code] = true;
     if (!G.started) return;
     if (e.code === 'Space' && skyTap()) { e.preventDefault(); return; }   // スカイ: スペースで跳ぶ
+    if (e.code === 'KeyE' && G.poss === 1) cmdJump();   // 守備: E＝ジャンプ（ハンマーを止める）
     if (G.ctl) {   // 中継の視点で守備中: Q＝切替、スペース＝飛びつく（移動は update で WASD・矢印を読む）
       if (e.code === 'KeyQ' || e.code === 'ShiftLeft') cmdSwitch();
       if (e.code === 'Space') { e.preventDefault(); cmdDive(G.stick.x || G.stick.y ? screenDirToWorld(G.stick.x, G.stick.y) : null); }
@@ -5571,6 +5685,10 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
         holding: pl === G.holder && G.phase === 'hold' && !(G.aiPend && G.aiPend.h === pl),
         hasDisc: pl === G.holder && (G.phase === 'hold' || G.phase === 'timeout' || G.phase === 'trans'),
         scale: pl.hScale,   // 背の高さ
+        jz: jumpH(pl),   // ジャンプの高さ
+        armsUp: pl.jumpT0 != null && G.time - pl.jumpT0 >= 0 && G.time - pl.jumpT0 < jDur(pl) + 0.15 ? 1 : 0,   // ジャンプ中はブロックの構え
+        hand: handOf(pl.team),   // 利き手（ブロックで上げる手）
+        jumpT: pl.jumpT0 != null ? G.time - pl.jumpT0 : -1, jumpDur: jDur(pl), swatT: pl.swatT0 != null ? G.time - pl.swatT0 : -1,   // はたいてからの時間   // 跳んでからの時間（ブロックの動きの進み具合）
         holdYaw: pl === G.holder ? (pl.team === 0 ? G.yaw : Math.atan2((18.5 - pl.p[0]) * 0.3, 0 - pl.p[1])) : null };   // 赤は -y へ攻める。横のずれは弱めて、ほぼ真っすぐ前を向く
     });
     EV3D.clear();
@@ -5736,7 +5854,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       text('作戦タイム（時間は止まっています）', W / 2, (yb - 26) * d, 14, '#FFE650', 'center', true, d);
       text('青から赤へ線を引く＝担当の付け替え　／　2本指で寄る・引く', W / 2, (yb - 9) * d, 11, '#e6e9f5', 'center', false, d);
     } else if (G.ctl) {
-      text(IS_TOUCH ? '左ドラッグ＝黄色の輪を動かす／味方をドラッグ＝そこへ走らせる・タップ＝切替' : 'WASD・矢印＝黄色の輪を動かす／Q＝切替／スペース＝飛びつく／味方をドラッグ＝そこへ走らせる', 12 * d, H - 12 * d, 10, 'rgba(255,255,255,.85)', 'left', true, d);
+      text(IS_TOUCH ? '左ドラッグ＝黄色の輪を動かす／味方をドラッグ＝そこへ走らせる・タップ＝切替' : 'WASD・矢印＝黄色の輪を動かす／Q＝切替／スペース＝飛びつく／E＝ジャンプ／味方をドラッグ＝そこへ走らせる', 12 * d, H - 12 * d, 10, 'rgba(255,255,255,.85)', 'left', true, d);
       // スティックの見た目
       if (G.stickUI) {
         const s2 = G.stickUI;
@@ -5820,7 +5938,7 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
 
   function setTouch(on) { IS_TOUCH = on; document.body.classList.toggle('touch', on); resize(); touchUI = layoutTouchUI(); }
   // tick: 確認用。画面が隠れていて自動で進まないときに、1コマ分（計算＋描画）を手で進める
-  window.__match = { cmdTactic, pickIso, trajCount: () => TRAJ.size, trajKeys: () => [...TRAJ.keys()], startPull, setCpLevel, isOpen, laneClear, predictPos, selectCtl, cmdSwitch, tick: (dt) => { update(dt); placeCamera(); drawScene(dt); drawHUD(); }, G, T, use3d, BLUE, RED, cmdMarkShift, cmdDive, screenDirToWorld, update, quickPass, throughPass, setTouch, hitPlayer, screenToGround, startOffensePoint, startDefensePoint, changePossession, endTimeout, aiDecide, markerOf, skyTap, pointWind, passAt, showStats, startReplay, endReplay, restartMatch, showRoster, refreshK, throwOf, spCodes, BENCH, ALL, pointLegs, openSub, nextPull };
+  window.__match = { cmdJump, jumpH, planPass, launch, quickSpeed, cmdTactic, pickIso, trajCount: () => TRAJ.size, trajKeys: () => [...TRAJ.keys()], startPull, setCpLevel, isOpen, laneClear, predictPos, selectCtl, cmdSwitch, tick: (dt) => { update(dt); placeCamera(); drawScene(dt); drawHUD(); }, G, T, use3d, BLUE, RED, cmdMarkShift, cmdDive, screenDirToWorld, update, quickPass, throughPass, setTouch, hitPlayer, screenToGround, startOffensePoint, startDefensePoint, changePossession, endTimeout, aiDecide, markerOf, skyTap, pointWind, passAt, showStats, startReplay, endReplay, restartMatch, showRoster, refreshK, throwOf, spCodes, BENCH, ALL, pointLegs, openSub, nextPull };
 })();
 
 </script>
