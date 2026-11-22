@@ -5,12 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>アルティメットFPS 攻撃パート</title>
+<title>アルティメットFPS 攻撃練習</title>
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/build/three.module.js",
+  "three/addons/": "./vendor/three/examples/jsm/"
+} }
+</script>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #000; overscroll-behavior: none;
     font-family: "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif; user-select: none; -webkit-user-select: none;
     -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; }
+  #gl { position: absolute; left: 0; top: 0; }   /* 3D の選手（下）。2D の画面（#c）を透明で上に重ねる */
+  #c { position: absolute; left: 0; top: 0; }
   .ov { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(8, 18, 36, .80); color: #fff; }
   .panel { max-width: 680px; max-height: 92vh; overflow: auto; padding: 22px 30px; background: rgba(20, 32, 60, .94);
@@ -30,6 +38,11 @@
     font-size: 22px; cursor: pointer; display: none; }
   #menu { position: absolute; top: 58px; right: 8px; width: 260px; max-height: calc(100vh - 70px); overflow: auto;
     background: rgba(16,24,44,.94); border-radius: 12px; padding: 10px; display: none; color: #fff; }
+  .seg { display: flex; align-items: center; gap: 6px; margin: 0 0 14px; font-size: 14px; color: #c9d3ee; }
+  .seg button { font: inherit; font-size: 14px; padding: 6px 14px; border: 0; border-radius: 8px; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; }
+  .seg button.on { background: #7889FB; }
+  #result { z-index: 20; } #result td:last-child { font-weight: bold; color: #fff; font-size: 15px; } #result .lv { color: #FFE650; }
+  .rbtn { display: flex; justify-content: space-between; gap: 12px; } .big.sub { background: rgba(255,255,255,.18); }
   #menu h3 { margin: 6px 4px 6px; font-size: 13px; color: #C7CDFD; }
   #menu button { display: block; width: 100%; margin: 4px 0; padding: 9px 10px; border: 0; border-radius: 8px;
     background: rgba(255,255,255,.1); color: #fff; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
@@ -44,11 +57,12 @@
 <meta name="theme-color" content="#0f1830">
 </head>
 <body>
+<canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 <button id="menuBtn" aria-label="設定">⚙</button>
 <div id="menu"></div>
 <div id="overlay" class="ov"><div class="panel">
-  <h1>攻撃パート（最小版）</h1>
+  <h1>攻撃練習</h1>
   <p>7対7。あなたはディスクを持った選手の目になる。パスが通ると、捕った味方の目に視点が飛ぶ。<br>
      相手のエンドゾーンの中でキャッチすれば得点。5点取ったら勝ち。<br>
      相手（赤）はマンツーマンで守る。マークは「フォアハンド側へ投げさせる」位置に立つので、バックハンドで正面を通すとブロックされる。</p>
@@ -68,8 +82,11 @@
     </tbody>
     <tr><td>ターンオーバー</td><td>落ちた・カットされた・ブロックされた・場外・ストール10。<br>（守備パートはまだ無いので、いまは自陣からやり直し）</td></tr>
   </table>
+  <div class="seg" id="defLv">守りの強さ <button data-v="none">なし</button><button data-v="weak">弱い</button><button data-v="normal">ふつう</button><button data-v="strong">強い</button></div>
   <button id="start" class="big">タップして開始</button>
 </div></div>
+<div id="result" class="ov" style="display:none"><div class="panel"><div class="body"></div>
+  <div class="rbtn"><button class="big sub" data-a="home">ホームへ</button><button class="big" data-a="again">もう一度</button></div></div></div>
 <div id="rotate" class="ov"><div>📱↻<br>スマホを横向きにしてください</div></div>
 <script>
 /* ============================================================
@@ -1018,6 +1035,1685 @@
 
 </script>
 <script>
+/* 選手の顔ぶれ（能力・役割・個性・見た目・特殊スロー）。試合（match.js）とチーム作りの画面（team_ui.js）で同じものを使う
+ *   st: 速さ spd・切り返し cut・背の高さ hgt・キャッチ ctch・投げの正確さ acc・パワー pow・反応 rea・賢さ iq・体力 sta（1〜100、50 がふつう）
+ *   en: ユニフォームの背中の名前（ローマ字）／look.pc: パーソナルカラー（靴・手袋のベルト・番号のふち）／look.face: 顔（サンプルアバターの顔 C/V/X/Y/Z）／look.eye: 黒目の色／look.hs: 髪型（render3d.js の hairMesh。sC〜sZ はサンプルアバターの髪、v1〜v4・m1〜m2 は VRoid で作った髪型、s_ で始まるのは毛束で作った髪型）
+ *   2026-11-20 match.js から移した */
+window.UFPS_ROSTER = [
+    {   // 青（あなたのチーム）。2026-11-20 オリジナルのキャラに（先発7人はタイトルの絵の7人）
+      7: { name: '一ノ瀬 颯', en: 'ICHINOSE', role: 'C', st: { spd: 80, cut: 82, hgt: 50, ctch: 74, acc: 52, pow: 56, rea: 80, iq: 55, sta: 78 }, look: { hair: 'black', hs: 'c7v3p', skin: 'light', shoes: 'black', acc: 'none', eye: 'charcoal', pc: [232, 44, 56], expr: { BRW_Angry: 0.25 }, body: { leg: 1.06 } }, traits: ['clutch', 'diver'] },   // 主人公。まっすぐで負けず嫌い
+      11: { name: '白銀 玲', en: 'SHIROGANE', role: 'H', st: { spd: 52, cut: 70, hgt: 50, ctch: 50, acc: 90, pow: 52, rea: 66, iq: 84, sta: 52 }, look: { hair: 'silver', hs: 'c11v5p', skin: 'pale', face: 'c11v5', tip: 'none', shoes: 'black', acc: 'sleeve_paint', eye: 'icy', pc: [70, 205, 240], expr: { EYE_Close: 0.2 }, body: { sh: 0.96, arm: 0.93, leg: 0.94 } }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['faker'] },   // クールで無口
+      3: { name: '春野 千夏', en: 'HARUNO', body: 'f', role: 'H', st: { spd: 52, cut: 60, hgt: 32, ctch: 66, acc: 82, pow: 40, rea: 56, iq: 74, sta: 90 }, look: { hair: 'brown', hs: 'c3', skin: 'light', shoes: 'black', acc: 'none', eye: 'brown', pc: [255, 208, 40], expr: { EYE_Joy: 0.25, MTH_Fun: 0.3 }, body: { leg: 0.95 } }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['mood'] },   // まとめ役
+      23: { name: '獅堂 剛', en: 'SHIDO', body: 'l', role: 'D', st: { spd: 70, cut: 50, hgt: 74, ctch: 72, acc: 44, pow: 88, rea: 48, iq: 45, sta: 70 }, look: { hair: 'blond', hs: 'm5', skin: 'medium', shoes: 'black', acc: 'none', eye: 'gold', pc: [255, 132, 28], expr: { EYE_Joy: 0.4, MTH_Joy: 0.4, BRW_Surprised: 0.2 }, body: { sh: 1.08, arm: 1.12, neck: 1.1 } }, sp: { fhT: 'highfore' }, traits: ['sky', 'bold'], traits9: ['sky'] },   // 熱血
+      9: { name: '藍沢 凛', en: 'AIZAWA', body: 'f', role: 'C', st: { spd: 72, cut: 90, hgt: 30, ctch: 52, acc: 48, pow: 46, rea: 88, iq: 52, sta: 86 }, look: { hair: 'navy', hs: 'sY', skin: 'fair', shoes: 'black', acc: 'wrist_pink', eye: 'blue', face: 'Y', pc: [150, 92, 255], expr: { BRW_Angry: 0.15, MTH_Fun: 0.1 }, body: { arm: 0.92, leg: 0.93 } }, traits: ['tough'] },   // 切り返しはチーム一
+      14: { name: '桃瀬 ひなた', en: 'MOMOSE', body: 'f', role: 'D', st: { spd: 58, cut: 48, hgt: 72, ctch: 76, acc: 46, pow: 64, rea: 52, iq: 50, sta: 60 }, look: { hair: 'pink', hs: 'c14', skin: 'fair', shoes: 'black', acc: 'hairtie_y', eye: 'pink', pc: [255, 105, 175], expr: { EYE_Joy: 0.35, MTH_A: 0.2, MTH_Joy: 0.3 }, body: { sh: 1.05, leg: 1.05 } }, sp: { C: 'heli' }, traits: ['streaky', 'sky'], traits9: ['sky'] },   // 明るいお調子者
+      17: { name: '雪村 小春', en: 'YUKIMURA', body: 'f', role: 'H', st: { spd: 40, cut: 56, hgt: 30, ctch: 60, acc: 92, pow: 34, rea: 54, iq: 82, sta: 54 }, look: { hair: 'icy', hs: 'sC', skin: 'fair', shoes: 'black', acc: 'hairpin', eye: 'sky', face: 'C', pc: [200, 232, 255], expr: { MTH_Small: 0.3, BRW_Sorrow: 0.15 }, body: { arm: 0.93, leg: 0.94, bend: -0.06 } }, traits: ['pressure'], traits9: [] },   // 控え。投げは一番正確・緊張しやすい
+      21: { name: '黒崎 迅', en: 'KUROSAKI', role: 'C', st: { spd: 90, cut: 72, hgt: 48, ctch: 48, acc: 32, pow: 66, rea: 56, iq: 34, sta: 76 }, look: { hair: 'black', hs: 'c21', skin: 'tan', shoes: 'black', acc: 'shades', eye: 'red', face: 'Z', pc: [170, 232, 40], expr: { BRW_Angry: 0.3, MTH_SkinFung_R: 0.3, HA_Fung1: 0.4 }, body: { leg: 0.95, chest: 0.95 } }, traits: ['bold'], traits9: [] },   // 控え。チーム一の俊足
+      33: { name: '大河 岳', en: 'OKAWA', body: 'l', role: 'D', st: { spd: 50, cut: 32, hgt: 92, ctch: 66, acc: 48, pow: 76, rea: 44, iq: 58, sta: 60 }, look: { hair: 'black', hs: 'buzz', skin: 'medium', shoes: 'black', acc: 'wrist_orange+wrist_orange_r', eye: 'brown', face: 'X', pc: [20, 175, 165], expr: { EYE_Joy: 0.45, MTH_Joy: 0.35 }, body: { sh: 1.07, chest: 1.08, neck: 1.1 } }, traits: ['slow'], traits9: ['slow', 'sky'] },   // 控え。一番背が高い
+      5: { name: '翠川 智也', en: 'MIDORIKAWA', role: 'H', st: { spd: 46, cut: 58, hgt: 50, ctch: 56, acc: 88, pow: 50, rea: 54, iq: 92, sta: 50 }, look: { hair: 'green', hs: 'c5', skin: 'light', shoes: 'black', acc: 'glassesV', eye: 'green', face: 'V', pc: [40, 200, 120], expr: { MTH_Fun: 0.15 }, body: { arm: 0.93, leg: 0.95, bend: 0.14 } }, sp: { bhD: 'air', fhD: 'air', C: 'heli' }, traits: ['careful'], traits9: [] },   // 司令塔
+    },
+    {   // 赤（相手）
+      1: { name: 'カエサル', en: 'CAESAR', role: 'H', st: { spd: 52, cut: 66, hgt: 46, ctch: 49, acc: 89, pow: 48, rea: 72, iq: 90, sta: 60 }, look: { hair: 'brown', hs: 'buzz', skin: 'medium', shoes: 'white', acc: 'laurel' }, sp: { fhT: 'highfore', fhM: 'sharp' }, traits: ['clutch'] },
+      2: { name: 'ハンニバル', en: 'HANNIBAL', role: 'H', st: { spd: 52, cut: 92, hgt: 32, ctch: 52, acc: 71, pow: 49, rea: 74, iq: 94, sta: 65 }, look: { hair: 'black', hs: 'curly', skin: 'tan', shoes: 'black', acc: 'whiteband' }, sp: { bhT: 'scoober', bhM: 'big', fhM: 'big' }, traits: ['faker'] },
+      4: { name: 'エリザベス', en: 'ELIZABETH', body: 'f', role: 'H', st: { spd: 32, cut: 52, hgt: 28, ctch: 72, acc: 88, pow: 31, rea: 48, iq: 70, sta: 40 }, look: { hair: 'red', hs: 'v1', skin: 'fair', shoes: 'white', acc: 'crown' }, sp: { bhT: 'scoober', bhD: 'air' }, traits: ['careful', 'pressure'] },
+      6: { name: 'ニュートン', en: 'NEWTON', role: 'D', st: { spd: 53, cut: 29, hgt: 88, ctch: 67, acc: 51, pow: 69, rea: 47, iq: 74, sta: 45 }, look: { hair: 'white', hs: 'long', skin: 'fair', shoes: 'black', acc: 'glasses' }, sp: { C: 'heli' }, traits: ['sky'] },
+      8: { name: 'コロンブス', en: 'COLUMBUS', role: 'C', st: { spd: 89, cut: 72, hgt: 54, ctch: 46, acc: 34, pow: 69, rea: 46, iq: 30, sta: 75 }, look: { hair: 'brown', hs: 'm1', skin: 'light', shoes: 'brown', acc: 'captain' }, traits: ['bold', 'moody'] },
+      10: { name: 'マルコ・ポーロ', en: 'MARCO POLO', role: 'C', st: { spd: 66, cut: 89, hgt: 32, ctch: 54, acc: 48, pow: 53, rea: 91, iq: 49, sta: 90 }, look: { hair: 'brown', hs: 'm2', skin: 'medium', shoes: 'brown', acc: 'traveler' }, traits: ['diver', 'tough'] },
+      13: { name: '卑弥呼', en: 'HIMIKO', body: 'f', role: 'H', st: { spd: 40, cut: 60, hgt: 28, ctch: 60, acc: 82, pow: 34, rea: 62, iq: 85, sta: 55 }, look: { hair: 'black', hs: 'v4', skin: 'light', shoes: 'white', acc: 'goldband' }, traits: ['faker'] },   // 控え
+      15: { name: 'スパルタクス', en: 'SPARTACUS', role: 'C', st: { spd: 82, cut: 74, hgt: 50, ctch: 52, acc: 36, pow: 72, rea: 62, iq: 40, sta: 85 }, look: { hair: 'brown', hs: 'buzz', skin: 'tan', shoes: 'brown', acc: 'wristband' }, traits: ['diver'] },   // 控え
+      18: { name: 'ピョートル大帝', en: 'PETER', body: 'l', role: 'D', st: { spd: 56, cut: 30, hgt: 95, ctch: 62, acc: 46, pow: 80, rea: 42, iq: 60, sta: 58 }, look: { hair: 'brown', hs: 'slick', skin: 'fair', shoes: 'black', acc: 'captain' }, traits: ['sky'] },   // 控え
+      12: { name: '始皇帝', en: 'SHI HUANGDI', body: 'l', role: 'D', st: { spd: 70, cut: 47, hgt: 71, ctch: 66, acc: 54, pow: 87, rea: 49, iq: 54, sta: 60 }, look: { hair: 'black', hs: 'topknot', skin: 'light', shoes: 'black', acc: 'mianguan' }, sp: { fhT: 'highfore' }, traits: ['streaky', 'mood'] },
+    },
+];
+// 最初の先発7人と控え3人（[青, 赤]）。先発の並び順は、プルで並ぶ順など
+window.UFPS_TEAM_DEFAULT = { starters: [[7, 11, 3, 23, 9, 14, 5], [1, 2, 4, 6, 8, 10, 12]], bench: [[17, 21, 33], [13, 15, 18]] };
+
+// 前の青チーム（偉人）。2026-11-20 主人公チームをオリジナルにしたので使っていない。あとで「偉人チーム」として相手に出すときのために残す
+window.UFPS_ROSTER_LEGENDS_BLUE = {
+      7: { name: 'ナポレオン', en: 'NAPOLEON', role: 'H', st: { spd: 50, cut: 92, hgt: 34, ctch: 46, acc: 73, pow: 49, rea: 72, iq: 86, sta: 55 }, look: { hair: 'black', hs: 'm1', skin: 'light', shoes: 'black', acc: 'bicorne' }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['clutch'] },
+      11: { name: 'ダ・ヴィンチ', en: 'DA VINCI', role: 'H', st: { spd: 50, cut: 67, hgt: 52, ctch: 46, acc: 92, pow: 51, rea: 68, iq: 92, sta: 45 }, look: { hair: 'white', hs: 'long', skin: 'light', shoes: 'brown', acc: 'beret' }, sp: { bhD: 'air', fhD: 'air', C: 'heli' }, traits: ['faker'] },
+      3: { name: 'クレオパトラ', en: 'CLEOPATRA', body: 'f', role: 'H', st: { spd: 31, cut: 53, hgt: 30, ctch: 69, acc: 94, pow: 30, rea: 47, iq: 71, sta: 40 }, look: { hair: 'black', hs: 'v2', skin: 'tan', shoes: 'gold', acc: 'goldband' }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['careful', 'streaky'] },
+      23: { name: 'アレクサンドロス', en: 'ALEXANDER', body: 'l', role: 'D', st: { spd: 73, cut: 54, hgt: 69, ctch: 73, acc: 46, pow: 90, rea: 46, iq: 47, sta: 70 }, look: { hair: 'blond', hs: 'm2', skin: 'medium', shoes: 'white', acc: 'goldband' }, sp: { fhT: 'highfore' }, traits: ['sky'] },
+      9: { name: 'ジャンヌ', en: 'JEANNE', body: 'f', role: 'C', st: { spd: 74, cut: 88, hgt: 28, ctch: 51, acc: 48, pow: 48, rea: 94, iq: 49, sta: 88 }, look: { hair: 'brown', hs: 'v3', skin: 'fair', shoes: 'silver', acc: 'wristband' }, traits: ['tough', 'mood'] },
+      14: { name: 'チンギス', en: 'GENGHIS', role: 'C', st: { spd: 91, cut: 72, hgt: 51, ctch: 46, acc: 27, pow: 72, rea: 50, iq: 32, sta: 80 }, look: { hair: 'black', hs: 'buzz', skin: 'medium', shoes: 'brown', acc: 'furhat' }, traits: ['bold', 'diver'] },
+      17: { name: 'キュリー', en: 'CURIE', body: 'f', role: 'H', st: { spd: 38, cut: 55, hgt: 30, ctch: 62, acc: 84, pow: 36, rea: 55, iq: 90, sta: 60 }, look: { hair: 'brown', hs: 'bun', skin: 'fair', shoes: 'black', acc: 'wristband' }, traits: ['careful'] },   // 控え
+      21: { name: '織田信長', en: 'NOBUNAGA', role: 'C', st: { spd: 80, cut: 70, hgt: 42, ctch: 50, acc: 40, pow: 58, rea: 70, iq: 60, sta: 72 }, look: { hair: 'black', hs: 'topknot', skin: 'light', shoes: 'black', acc: 'whiteband' }, traits: ['bold'] },   // 控え
+      33: { name: 'リンカーン', en: 'LINCOLN', role: 'D', st: { spd: 55, cut: 35, hgt: 90, ctch: 66, acc: 50, pow: 60, rea: 45, iq: 72, sta: 62 }, look: { hair: 'black', hs: 'short', skin: 'light', shoes: 'black', acc: 'none' }, traits: ['tough'] },   // 控え
+      5: { name: 'ガリレオ', en: 'GALILEO', role: 'D', st: { spd: 49, cut: 26, hgt: 86, ctch: 74, acc: 48, pow: 70, rea: 48, iq: 69, sta: 45 }, look: { hair: 'brown', hs: 'slick', skin: 'light', shoes: 'black', acc: 'glasses' }, sp: { C: 'heli' }, traits: ['slow'] },
+};
+// 個性の名前（試合の画面・選手を見る画面で使う。2026-11-21 match.js から移した）
+window.UFPS_TRAIT = {
+  bold: '強気', careful: '慎重', clutch: '勝負強い', pressure: 'プレッシャーに弱い', streaky: 'お調子者', slow: 'スロースターター',
+  sky: '空中戦好き', diver: '飛び込み屋', tough: '粘り強い', faker: 'フェイク上手', mood: 'ムードメーカー', moody: '気分屋',
+};
+// 見た目の色（3D の選手の髪・目・肌・靴。render3d.js が使う。2026-11-21 match.js から移した）
+window.LOOK_COLOR = {
+  hair: { black: [32, 28, 26], brown: [105, 68, 40], blond: [222, 190, 110], red: [175, 68, 34], white: [228, 228, 222],
+    silver: [196, 200, 210], navy: [40, 52, 110], green: [46, 110, 74], pink: [236, 120, 168], icy: [200, 228, 240] },   // 2026-11-20 主人公チームの髪の色
+  eye: { charcoal: [74, 76, 84], amber: [196, 120, 40], icy: [150, 200, 235], green: [60, 170, 100], blue: [60, 130, 230], sky: [110, 190, 240], red: [190, 40, 50], brown: [120, 70, 40], gold: [215, 165, 40], pink: [230, 100, 160] },   // 黒目の色（2026-11-20）
+  skin: { pale: [242, 194, 162], fair: [242, 210, 186], light: [228, 186, 152], medium: [198, 148, 110], tan: [165, 115, 80], dark: [108, 72, 52] },
+  shoes: { black: [30, 30, 32], brown: [96, 62, 38], white: [236, 236, 236], silver: [178, 180, 190], gold: [205, 165, 60] },
+};
+
+</script>
+<script>
+/* ============================================================
+ * ユニフォーム（シャツ・ゲームパンツ）を描く。2026-11-20 林さん「チーム画面で選べる」「ゲームパンツも作成して」
+ *   設計: 20261120_ユニフォームの設計メモ_v2.md（リサーチ: 全面プリント・番号は詰まった太字＋縁取り1本・名前は背番号の上）
+ *   ・シャツの元の画像（VRoid のTシャツ。上半分＝前、下半分＝後ろ）のしわの陰を残して、柄・番号・名前を塗る
+ *   ・柄: pins（グラデーション＋細い斜線）／ side（サイドパネル）／ topo（等高線）
+ *   ・色: PALETTE（チームの色ごとに 基本・明るい・濃い・差し色・数字・縁取り・パンツ）
+ *   ・文字: assets/uniform/font_atlas.png（英大文字・数字を画像にしたもの。tools/make_uniform_assets.py で作る）
+ *   ・パンツの画像: 横に並んだ帯で、前＝真ん中（x 128〜384、真ん中が前の縫い目）、わき＝x 128 と 384 のあたり、後ろ＝両端
+ *   使い方: Uniform.ready.then(...)。Uniform.jersey(元の画像, キット, 番号, 名前) → canvas。Uniform.pants(元の画像, キット, 番号) → canvas
+ *           キット = { design, pal（PALETTE の1つ）, chest（胸の英字。空なら番号だけ） }
+ * ============================================================ */
+(function () {
+  const PALETTE = {
+    blue: { main: [36, 96, 235], light: [120, 170, 255], dark: [12, 26, 78], accent: [255, 214, 64], num: [255, 255, 255], key: [12, 26, 78], pants: [16, 26, 64] },
+    purple: { main: [124, 62, 215], light: [190, 150, 255], dark: [38, 16, 78], accent: [255, 214, 64], num: [255, 255, 255], key: [38, 16, 78], pants: [34, 16, 66] },
+    sky: { main: [34, 178, 224], light: [160, 232, 250], dark: [10, 48, 90], accent: [255, 255, 255], num: [10, 40, 80], key: [255, 255, 255], pants: [12, 40, 76] },
+    yellow: { main: [246, 200, 30], light: [255, 236, 140], dark: [34, 34, 40], accent: [34, 34, 40], num: [28, 28, 34], key: [255, 255, 255], pants: [30, 30, 36] },
+    white: { main: [240, 242, 246], light: [255, 255, 255], dark: [77, 78, 82], accent: [40, 100, 235], num: [24, 24, 30], key: [255, 255, 255], pants: [77, 78, 82], deep: [22, 34, 78], gold: [196, 156, 62], ivory: [247, 245, 239] },   // 白（2026-11-20。あなたのチームの初めの色）
+    black: { main: [44, 44, 52], light: [100, 100, 112], dark: [12, 12, 16], accent: [255, 214, 64], num: [255, 255, 255], key: [12, 12, 16], pants: [16, 16, 20] },
+    red: { main: [214, 40, 40], light: [255, 120, 110], dark: [40, 12, 16], accent: [255, 255, 255], num: [255, 255, 255], key: [40, 12, 16], pants: [24, 10, 12] },   // 相手
+  };
+  const DESIGNS = { prestige: '上品', pr_navy: '上品・紺', pr_gold: '上品・金', pr_sky: '上品・水色', pr_hem: '上品・上下', pr_pin: '上品・ストライプ', band: '胸の帯', sleeve: '袖グラデ', wave: '光の波', crest: 'クラシック', cr_ivory: 'クラシック・白地', cr_blue: 'クラシック・青の線', cr_sleeve: 'クラシック・袖の線', cr_chest: 'クラシック・胸の線', cr_panel: 'クラシック・紺のパネル', pins: 'グラデーション', side: 'サイドパネル', topo: '等高線' };
+  // 上品の派生（2026-11-20）: sh 肩の色 / lat 格子の色（null で無し）/ latA 格子の濃さ / pinW・pinA ピンストライプの太さ・濃さ / hem すそからもグラデーション
+  const PRV = {
+    prestige: { sh: 'accent', lat: [212, 214, 222], latA: 0.45, pinW: 1.4, pinA: 0.32 },
+    pr_navy: { sh: 'deep', lat: [212, 214, 222], latA: 0.45, pinW: 1.4, pinA: 0.32 },
+    pr_gold: { sh: 'gold', lat: [214, 196, 150], latA: 0.4, pinW: 1.4, pinA: 0.32 },
+    pr_sky: { sh: 'sky', lat: [176, 208, 236], latA: 0.45, pinW: 1.4, pinA: 0.28 },
+    pr_hem: { sh: 'accent', lat: [212, 214, 222], latA: 0.45, pinW: 1.4, pinA: 0.32, hem: true },
+    pr_pin: { sh: 'accent', lat: null, latA: 0, pinW: 2.2, pinA: 0.7 },
+  };
+  const WHITE_SET = new Set(['cr_ivory', 'cr_blue', 'cr_sleeve', 'cr_chest', 'cr_panel', 'prestige', 'pr_navy', 'pr_gold', 'pr_sky', 'pr_hem', 'pr_pin', 'band', 'sleeve', 'wave', 'crest']);   // 白の上品な候補（細部とパンツを紺と金にする）
+  const BODY_X = [117, 395], FRONT_Y = [88, 422], BACK_Y = [598, 936], CX = 256;
+
+  // 素材を読む（相対パス。試合とホームで同じ場所）
+  const img = (src) => new Promise((ok, ng) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ng; i.src = src; });
+  let atlas = null, meta = null, shirtBase = null, isReady = false;
+  const ready = Promise.all([img('assets/uniform/font_atlas.png'), fetch('assets/uniform/font_atlas.json').then((r) => r.json()), img('assets/uniform/shirt_base.png')])
+    .then(([a, m, s]) => { atlas = a; meta = m; shirtBase = s; isReady = true; })
+    .catch((e) => { console.warn('ユニフォームの素材を読めない', e); });
+
+  const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const rgb = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+  function pixels(src) { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; const g = c.getContext('2d'); g.drawImage(src, 0, 0); return { c, g, d: g.getImageData(0, 0, c.width, c.height) }; }
+
+  // ---- シャツの画像の形（2026-11-20）: 列ごとの上端・下端（前・後ろ）、行ごとの左右のはし ----
+  const GEOM = new WeakMap();
+  function geom(base, px, W, H) {
+    if (GEOM.has(base)) return GEOM.get(base);
+    const topF = new Int16Array(W).fill(-1), topB = new Int16Array(W).fill(-1), botF = new Int16Array(W).fill(-1), botB = new Int16Array(W).fill(-1), lE = new Int16Array(H).fill(-1), rE = new Int16Array(H).fill(-1);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (px[(y * W + x) * 4 + 3] <= 128) continue;
+      if (y < H / 2) { if (topF[x] < 0) topF[x] = y; botF[x] = y; } else { if (topB[x] < 0) topB[x] = y; botB[x] = y; }
+      if (lE[y] < 0) lE[y] = x; rE[y] = x;
+    }
+    const G = { topF, topB, botF, botB, lE, rE }; GEOM.set(base, G); return G;
+  }
+  // オリジナルの紋章（盾＋頭文字＋ディスクの弧）。(cx, cy) 中心、h 高さ [px]
+  function emblem(g, cx, cy, h, P, letter) {
+    const w = h * 0.84, path = () => { g.beginPath(); g.moveTo(cx - w / 2, cy - h / 2); g.lineTo(cx + w / 2, cy - h / 2); g.lineTo(cx + w / 2, cy + h * 0.08);
+      g.quadraticCurveTo(cx + w / 2, cy + h * 0.36, cx, cy + h / 2); g.quadraticCurveTo(cx - w / 2, cy + h * 0.36, cx - w / 2, cy + h * 0.08); g.closePath(); };
+    path(); g.fillStyle = rgb(P.accent); g.fill();
+    g.save(); g.translate(cx, cy); g.scale(0.84, 0.86); g.translate(-cx, -cy); path(); g.fillStyle = rgb(P.dark); g.fill(); g.restore();
+    g.strokeStyle = rgb(P.accent); g.lineWidth = Math.max(1.5, h * 0.06); g.beginPath(); g.ellipse(cx, cy - h * 0.2, w * 0.3, h * 0.08, -0.25, Math.PI * 0.1, Math.PI * 1.15); g.stroke();   // ディスクの弧
+    if (isReady && letter) drawText(g, letter, cx, cy + h * 0.06, h * 0.36, w * 0.6, P.num, P.dark, 0);
+  }
+  // ---- シャツの柄（チームごとに1回だけ描いて、選手ごとに写して文字を足す） ----
+  const patCache = new WeakMap();   // 元の画像 → { 柄と色 → 描いた柄 }
+  function pattern(base, kit) {
+    if (!patCache.has(base)) patCache.set(base, new Map());
+    const cache = patCache.get(base), key = kit.design + '|' + JSON.stringify(kit.pal);
+    if (cache.has(key)) return cache.get(key);
+    const { c, g, d } = pixels(base), px = d.data, W = c.width, H = c.height, P = kit.pal, px0 = new Uint8ClampedArray(px);
+    let lmax = 1; for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) lmax = Math.max(lmax, px[i]);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4; if (px[i + 3] <= 128) continue;
+      const shade = 0.55 + 0.45 * ((px[i] + px[i + 1] + px[i + 2]) / 3) / lmax;
+      const front = y < H / 2, sleeve = x < BODY_X[0] + 4 || x > BODY_X[1] - 4;
+      const ylp = front ? y - FRONT_Y[0] : y - BACK_Y[0], yl = ylp / (front ? FRONT_Y[1] - FRONT_Y[0] : BACK_Y[1] - BACK_Y[0]);
+      let col;
+      if (kit.design === 'pins') {   // すそへ向かって濃く＋細い斜線。袖は濃い色、袖口に差し色
+        col = mixc(P.main, P.dark, Math.min(1, Math.max(0, yl * 0.9)));
+        if (!sleeve && ((x + y * 0.8) % 22) < 2.2) col = mixc(col, P.light, 0.35);
+        if (sleeve) col = (x < 60 || x > 452) ? P.accent : P.dark;
+      } else if (kit.design === 'side') {   // わき腹から袖へ濃い色の山形。境目に差し色
+        const dx = Math.abs(x - CX), edge = 70 + 0.35 * Math.abs(ylp - 200);
+        col = P.main;
+        if (!sleeve && dx > edge) col = P.dark;
+        if (!sleeve && Math.abs(dx - edge) < 5) col = P.accent;
+        if (sleeve) { const s = x < CX ? 1 : -1, sx = x < CX ? 70 : 442; col = Math.abs((x - sx) * s + (ylp - 90) * 0.7) < 7 ? P.accent : P.dark; }
+      } else if (PRV[kit.design]) {   // 上品（2026-11-20）とその派生: オフホワイト＋トーナルの格子＋金のピンストライプ＋肩のグラデーション
+        const IV = P.ivory || P.main, DP = P.deep || P.dark, GD = P.gold || P.accent, V = PRV[kit.design];
+        const SH = V.sh === 'deep' ? DP : V.sh === 'gold' ? GD : V.sh === 'sky' ? [120, 190, 245] : P.accent;   // 肩の色
+        col = IV;
+        const lat = V.lat && (((x + y) % 30 + 30) % 30 < 1.3 || ((x - y) % 30 + 30) % 30 < 1.3);   // ひし形の格子
+        if (lat) col = mixc(col, V.lat, V.latA);
+        const dxp = Math.abs(x - CX);
+        if (!sleeve && dxp > 100) col = mixc(col, [222, 224, 232], 0.55);                 // わき腹のパネル
+        if (!sleeve && dxp <= 96 && ((x - CX) % 24 + 24) % 24 < V.pinW) col = mixc(col, GD, V.pinA);   // 金のピンストライプ
+        const Gp = geom(base, px0, W, H), dT = y - (front ? Gp.topF[x] : Gp.topB[x]);
+        if (dT >= 0 && dT < 58) { const t = dT / 58; col = mixc(SH, col, t * t * (3 - 2 * t)); }   // 肩のグラデーション（色 → 白）
+        if (dT >= 58 && dT < 61) col = V.sh === 'gold' ? DP : GD;                       // 境目の線（金の肩のときは紺）
+        if (V.hem && !sleeve) { const dB = (front ? Gp.botF[x] : Gp.botB[x]) - y;      // すそからのグラデーション
+          if (dB >= 15 && dB < 75) { const t = (dB - 15) / 60; col = mixc(SH, col, t * t * (3 - 2 * t)); }
+          if (dB >= 75 && dB < 78) col = GD; }
+      } else if (kit.design === 'band') {   // 胸の帯: 胸に青の横帯（上下に金の線）＋細かいトーナルの縦じま
+        const IV = P.ivory || P.main, GD = P.gold || P.accent;
+        col = ((x % 10) < 1) ? mixc(IV, [214, 216, 224], 0.5) : IV;
+        const yb = front ? y - FRONT_Y[0] : y - BACK_Y[0], b0 = front ? 98 : 40, b1 = front ? 140 : 84;   // 帯の上下（前はチーム名、後ろは名前の所）
+        if (yb >= b0 && yb < b1) col = mixc(P.accent, P.deep || P.dark, (yb - b0) / (b1 - b0) * 0.35);
+        if ((yb >= b0 - 5 && yb < b0 - 2) || (yb >= b1 + 2 && yb < b1 + 5)) col = GD;
+      } else if (kit.design === 'sleeve') {   // 袖グラデ: 白の胴＋うすい横じま、袖が青 → 紺、わきに金の2本線
+        const IV = P.ivory || P.main, GD = P.gold || P.accent;
+        col = ((y % 12) < 1.2) ? mixc(IV, [218, 220, 228], 0.5) : IV;
+        if (sleeve) { const de = x < CX ? 117 - x : x - 395; col = mixc(P.accent, P.deep || P.dark, Math.max(0, Math.min(1, de / 90))); }
+        const dxs = Math.abs(x - CX); if (!sleeve && ((dxs > 120 && dxs < 123) || (dxs > 127 && dxs < 130))) col = GD;
+      } else if (kit.design === 'wave') {   // 光の波: うすい青の大きな波（2重）＋金の細い波線
+        const IV = P.ivory || P.main, GD = P.gold || P.accent;
+        col = IV;
+        const xn = (x - 117) / 278, yn = front ? (y - FRONT_Y[0]) / 334 : (y - BACK_Y[0]) / 334, xs = front ? xn : 1 - xn;
+        const w1 = 0.82 - xs * 0.55 + Math.sin(xs * 5.2) * 0.07, w2 = w1 + 0.12;
+        if (yn > w1) col = mixc(col, mixc(P.accent, [255, 255, 255], 0.55), Math.min(1, (yn - w1) * 6) * 0.85);
+        if (yn > w2) col = mixc(col, P.accent, 0.55);
+        if (Math.abs(yn - (w1 - 0.035)) < 0.006) col = GD;
+        if (sleeve) col = mixc(IV, P.accent, 0.15);
+      } else if (kit.design === 'crest' || kit.design.startsWith('cr_')) {   // クラシック（2026-11-20。紋章のすかしは消した）とその派生
+        const dz = kit.design, GD = P.gold || P.accent, DP = P.deep || P.dark;
+        const CR = dz === 'cr_ivory' ? (P.ivory || P.main) : [243, 238, 226], L1 = dz === 'cr_blue' ? P.accent : DP;   // 地の色・わきの1本目の線の色
+        col = CR;
+        const yb = front ? y - FRONT_Y[0] : y - BACK_Y[0], dxs = Math.abs(x - CX);
+        if (dz === 'cr_panel') { if (!sleeve && dxs > 112) col = DP; if (!sleeve && dxs > 106 && dxs <= 109) col = GD; }   // わき腹の紺のパネル＋金の線
+        else { if (!sleeve && dxs > (dz === 'cr_blue' ? 115 : 118) && dxs < 122) col = L1; if (!sleeve && dxs > 125 && dxs < 128) col = GD; }        // わきの2本線
+        if (dz === 'cr_chest' && !sleeve) { const a = front ? 146 : 80; if (yb >= a && yb < a + 4) col = DP; if (yb >= a + 7 && yb < a + 9) col = GD; }   // 胸（背中）の横線
+        if (dz === 'cr_sleeve' && sleeve && (front ? y < 236 : y < 748)) { const Gs = geom(base, px0, W, H), de = x < CX ? x - Gs.lE[y] : Gs.rE[y] - x;   // 袖の先の2本線
+          if (de >= 20 && de < 25) col = DP; if (de >= 28 && de < 31) col = GD; }
+      } else {   // topo: 等高線をうっすら。肩は濃い色、境目に差し色
+        const xn = x / 512, yn = (front ? y : y - 510) / 512;
+        const v = Math.sin(xn * 7.1 + yn * 3.3) + Math.sin(xn * 2.3 - yn * 6.7 + 1.3) * 0.8 + Math.sin((xn + yn) * 11 + 0.5) * 0.35;
+        const fr = ((v * 4.2) % 1 + 1) % 1;
+        col = Math.abs(fr - 0.5) < 0.045 ? mixc(P.main, P.light, 0.55) : P.main;
+        if (ylp < 40 || sleeve) col = P.dark;
+        if (!sleeve && Math.abs(ylp - 40) < 4) col = P.accent;
+      }
+      // ---- 細部（2026-11-20）----
+      const Gm = geom(base, px0, W, H), dTop = y - (front ? Gm.topF[x] : Gm.topB[x]), dBot = (front ? Gm.botF[x] : Gm.botB[x]) - y;
+      const neck = x > 196 && x < 316;
+      const WS = WHITE_SET.has(kit.design), TD = WS ? (P.deep || P.dark) : P.dark, TA = WS ? (P.gold || P.accent) : P.accent;   // 細部の色（上品は紺と金）
+      if (!sleeve && !WS) { const yl2 = Math.max(0, Math.min(1, yl)), cell = 9, rr = 0.6 + 2.6 * yl2 * yl2, dx = (x % cell) - cell / 2, dy = (y % cell) - cell / 2; if (dx * dx + dy * dy < rr * rr) col = mixc(col, P.light, 0.16); }   // 網点（下ほど大きい）
+      if (neck && dTop < 11) col = dTop >= 8 ? TA : TD;                                             // 襟（リブ＋差し色の線）
+      else if (!neck && dTop >= 0 && dTop < 3 && !WS) col = TA;              // 肩のパイピング（上品はグラデーションがあるので無し）
+      const sleeveRow = front ? y < 236 : y < 748;
+      if (sleeve && sleeveRow) { const de = x < CX ? x - Gm.lE[y] : Gm.rE[y] - x; if (de >= 0 && de < 13) col = de >= 10 ? TA : TD; }   // 袖口
+      if (!sleeve && dBot >= 0 && dBot < 15) col = dBot >= 12 ? TA : TD;                        // すそ
+      px[i] = col[0] * shade; px[i + 1] = col[1] * shade; px[i + 2] = col[2] * shade;
+    }
+    g.putImageData(d, 0, 0);
+    const EP = WHITE_SET.has(kit.design) ? Object.assign({}, P, { accent: P.gold || P.accent, dark: P.deep || P.dark, num: P.gold || P.num }) : P;   // 上品: 紺の盾に金
+    emblem(g, 322, FRONT_Y[0] + 76, 40, EP, ((kit.chest || '').trim()[0] || 'U').toUpperCase());   // 左胸のエンブレム
+    cache.set(key, c);
+    return c;
+  }
+
+  // ---- 文字（英大文字・数字）。縁取りを先に、上に字を重ねる ----
+  const tint = new Map();
+  function tinted(color) {   // 文字の画像を、その色に塗ったもの
+    const k = color.join(); if (tint.has(k)) return tint.get(k);
+    const c = document.createElement('canvas'); c.width = atlas.width; c.height = atlas.height;
+    const g = c.getContext('2d'); g.drawImage(atlas, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = rgb(color); g.fillRect(0, 0, c.width, c.height);
+    tint.set(k, c); return c;
+  }
+  function textW(str, s) { let w = 0; for (const ch of str) w += ch === ' ' ? meta.space * s : meta.glyphs[ch] ? meta.glyphs[ch].adv * s : 0; return w; }
+  // 中心 (cx, cy) に、字の高さ capPx で書く。maxW を超えるなら横に詰める。key 縁取りの太さ [px]
+  function drawText(g, str, cx, cy, capPx, maxW, fill, keyCol, key) {
+    str = (str || '').toUpperCase().replace(/[^A-Z0-9 .\-&']/g, '');
+    if (!str) return;
+    const s = capPx / meta.cap, w = textW(str, s), sx = w > maxW ? maxW / w : 1;
+    const base = cy + capPx / 2;
+    const layer = (img, off) => {
+      let pen = cx - (w * sx) / 2;
+      for (const ch of str) {
+        if (ch === ' ') { pen += meta.space * s * sx; continue; }
+        const q = meta.glyphs[ch]; if (!q) continue;
+        g.drawImage(img, q.x, q.y, q.w, q.h, pen + q.ox * s * sx + off[0], base + q.oy * s + off[1], q.w * s * sx, q.h * s);
+        pen += q.adv * s * sx;
+      }
+    };
+    if (key > 0) { const kimg = tinted(keyCol); for (let a = 0; a < 16; a++) { const t = a / 16 * Math.PI * 2; layer(kimg, [Math.cos(t) * key, Math.sin(t) * key]); } }
+    layer(tinted(fill), [0, 0]);
+  }
+
+  // ---- シャツ: 柄＋前（胸の英字・番号）＋後ろ（名前・背番号） ----
+  function jersey(base, kit, num, name, pc) {   // pc: パーソナルカラー（番号のふち。2026-11-20）
+    const pat = pattern(base, kit), c = document.createElement('canvas'); c.width = pat.width; c.height = pat.height;
+    const g = c.getContext('2d'); g.drawImage(pat, 0, 0);
+    const P0 = kit.pal, P = WHITE_SET.has(kit.design) ? Object.assign({}, P0, { num: P0.deep || P0.num, key: P0.gold || P0.key }) : P0, n = String(num);   // 上品: 紺の番号に金のふち
+    if (kit.chest) drawText(g, kit.chest, CX, FRONT_Y[0] + 118, 30, 210, kit.design === 'band' ? [255, 255, 255] : P.num, kit.design === 'band' ? (P0.deep || P.key) : P.key, 2);
+    drawText(g, n, CX, FRONT_Y[0] + (kit.chest ? 205 : 170), 70, 200, P.num, P.key, 3.5);   // 前の番号（規定: 4インチ以上）
+    drawText(g, name, CX, BACK_Y[0] + 62, 26, 230, kit.design === 'band' ? [255, 255, 255] : P.num, kit.design === 'band' ? (P0.deep || P.key) : P.key, 2);                         // 名前（背番号の上）
+    drawText(g, n, CX, BACK_Y[0] + 188, 142, 240, P.num, P.key, 6);                          // 背番号（規定: 6インチ以上）
+    return c;
+  }
+
+  // ---- ゲームパンツ: 無地（しわの陰だけ残す）＋わきに差し色の線＋腰のゴムは濃い色＋前の左足に番号 ----
+  function pants(base, kit, num, pc) {
+    const P0 = kit.pal, P = WHITE_SET.has(kit.design) ? Object.assign({}, P0, { pants: P0.deep || P0.pants, accent: P0.gold || P0.accent, main: P0.ivory || P0.main, dark: P0.deep || P0.dark, num: P0.gold || P0.num }) : P0;   // 白の候補: 紺に金
+    const { c, g, d } = pixels(base), px = d.data, W = c.width, H = c.height;
+    let hb = 0; const lum = new Float32Array(W * H); let sum = 0, cnt = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 3] > 128) { hb = Math.max(hb, y); const l = (px[i] + px[i + 1] + px[i + 2]) / 3; lum[y * W + x] = l; sum += l; cnt++; } }
+    const avg = sum / Math.max(1, cnt);
+    const bot = new Int16Array(W).fill(-1); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (px[(y * W + x) * 4 + 3] > 128) bot[x] = y;   // 列ごとのすその位置
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4; if (px[i + 3] <= 128) continue;
+      const shade = Math.min(1.12, Math.max(0.78, 0.5 + 0.5 * lum[y * W + x] / avg));   // ボタン・ポケットの絵が目立たないよう、陰は弱めに
+      let col = P.pants;
+      const side = Math.min(Math.abs(x - 128), Math.abs(x - 384));
+      if (side < 9) col = P.accent; else if (side < 13) col = P.main;   // わきの線（差し色＋基本の色の細い縁）
+      if (y < hb * 0.07) col = P.dark;                                     // 腰のゴム
+      else if (y < hb * 0.085) col = P.accent;                             // 腰のゴムの下の細い線（2026-11-20）
+      const db = bot[x] - y; if (db >= 0 && db < 14) col = db >= 11 ? P.accent : P.dark;   // すその帯（2026-11-20）
+      px[i] = col[0] * shade; px[i + 1] = col[1] * shade; px[i + 2] = col[2] * shade;
+    }
+    g.putImageData(d, 0, 0);
+    const cnum = P.pants[0] + P.pants[1] + P.pants[2] < 300 ? [255, 255, 255] : [20, 20, 26];
+    drawText(g, String(num), 322, hb * 0.66, hb * 0.16, 70, cnum, P.pants, 0);
+    emblem(g, 190, hb * 0.66, hb * 0.17, P, ((kit.chest || '').trim()[0] || 'U').toUpperCase());   // 右足の前のエンブレム（2026-11-20）   // 前の左足（規定: 入れるなら前の片足に 2インチ以上）
+    return c;
+  }
+
+  // チーム画面の見本: 前から見たシャツを小さく
+  function preview(design, colorKey, w = 66) {
+    if (!isReady) return null;
+    const kit = { design, pal: PALETTE[colorKey] || PALETTE.blue, chest: '' };
+    const j = jersey(shirtBase, kit, 7, ''), c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * 0.78);
+    c.style.cssText = `display:block;width:${w}px;height:${c.height}px;position:static;`;   // ページの canvas の決まり（画面いっぱい）に巻き込まれないように
+    c.getContext('2d').drawImage(j, 0, 70, 512, 400, 0, 0, c.width, c.height);
+    return c;
+  }
+  window.Uniform = { ready, isReady: () => isReady, jersey, pants, preview, PALETTE, DESIGNS };
+})();
+
+</script>
+<script>
+/* ============================================================
+ * チーム作りの画面（ホームと試合前の両方で使う。2026-11-20 林さん「チーム作り」→ A 先発・C 名前と色／ホームと試合前の両方／保存はしない）
+ *   ・10人から先発7人と控え3人を選ぶ（名前をタップで、先発と控えを1人ずつ入れ替え）
+ *   ・チーム名（点数の表示などに出る）とユニフォームの色
+ *   ・この端末には保存しない。開いている間（sessionStorage）だけ覚えていて、ホーム → 試合 へ持ち越す。アプリを閉じると最初の形に戻る
+ *   使い方: TeamUI.open({ ok: '決定', onDone: (st) => {...} })。今の形は TeamUI.load()
+ *   選手の顔ぶれは roster.js（window.UFPS_ROSTER）
+ * ============================================================ */
+(function () {
+  // 目印の名前（class）は、試合の画面の決まり（.ov＝画面いっぱいの幕 など）とぶつからない名前にする（2026-11-20 林さん「総合60の画面しか映らない」）
+  const KEY = 'ufps_team';
+  // ユニフォームの色（相手の赤と見分けにくい赤・橙・桃は入れない）。ui は 2D の表示（ミニマップ・札）に使う色
+  const COLORS = {
+    blue: { name: '青', top: [40, 105, 255], bottom: [235, 238, 245], ui: '59,108,255' },
+    purple: { name: '紫', top: [140, 70, 230], bottom: [235, 238, 245], ui: '140,80,235' },
+    sky: { name: '水色', top: [40, 190, 230], bottom: [30, 40, 70], ui: '30,170,220' },
+    yellow: { name: '黄', top: [245, 200, 30], bottom: [30, 40, 70], ui: '200,160,20' },
+    white: { name: '白', top: [240, 242, 246], bottom: [77, 78, 82], ui: '40,100,235' },   // 2026-11-20
+    black: { name: '黒', top: [38, 38, 46], bottom: [235, 238, 245], ui: '60,60,75' },
+  };
+  const R = window.UFPS_ROSTER, DEF = window.UFPS_TEAM_DEFAULT;
+  const ROLE = { H: 'ハンドラー', C: 'カッター', D: 'ディープ' };
+  const def = () => ({ name: '', color: 'white', design: 'cr_ivory', starters: DEF.starters[0].slice() });
+  function load() {
+    try {
+      const st = Object.assign(def(), JSON.parse(sessionStorage.getItem(KEY) || '{}'));
+      const all = DEF.starters[0].concat(DEF.bench[0]);
+      if (!Array.isArray(st.starters) || st.starters.length !== 7 || !st.starters.every((n) => all.includes(n))) st.starters = def().starters;
+      if (!COLORS[st.color]) st.color = 'white';
+      if (!['cr_ivory', 'prestige', 'pins', 'side', 'topo'].includes(st.design)) st.design = 'cr_ivory';
+      return st;
+    } catch (e) { return def(); }
+  }
+  function save(st) { try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* 覚えられない環境 */ } }
+  const overall = (n) => { const s = R[0][n].st, v = Object.values(s); return Math.round(v.reduce((a, b) => a + b, 0) / v.length); };
+
+  const box = document.createElement('div');
+  box.id = 'teamBox';
+  const css = document.createElement('style');
+  css.textContent = `#teamBox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(8,14,30,.6); font-family: "Meiryo UI", sans-serif; color: #fff; }
+    #teamBox .pn { width: min(760px, 96vw); max-height: 94vh; overflow: auto; background: rgba(20,30,58,.97); border-radius: 14px; padding: 10px 14px; box-sizing: border-box; }
+    #teamBox h3 { margin: 2px 0 6px; font-size: 16px; }
+    #teamBox .tbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; margin-bottom: 4px; }
+    #teamBox input { font: inherit; font-size: 14px; width: 9.5em; padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; }
+    #teamBox .chip { width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.55); cursor: pointer; padding: 0; }   /* 黒も見えるよう細い白の縁 */
+    #teamBox .chip.on { border-color: #FFE650; }
+    #teamBox .pv { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 5px; border: 2px solid transparent; border-radius: 8px; background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 10px; cursor: pointer; vertical-align: middle; }
+    #teamBox .pv.on { border-color: #FFE650; } #teamBox .pv canvas { display: block; width: 54px !important; height: 42px !important; cursor: pointer; touch-action: auto; }   /* 試合の画面は canvas を全部画面いっぱいにする決まりがあるので、見本の絵は大きさを固定する（2026-11-20 林さん「総合60の画面しか映らない」） */
+    #teamBox .note { margin: 2px 0 4px; font-size: 12px; color: #C7CDFD; }
+    /* 2026-11-21 左にベンチ、右にフィールド */
+    #teamBox .lay { display: flex; gap: 12px; align-items: stretch; } #teamBox h4 { margin: 2px 0 4px; font-size: 13px; color: #C7CDFD; }
+    #teamBox .bench { width: 150px; flex: none; display: flex; flex-direction: column; } #teamBox .bench .list { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 6px; padding: 6px 0; border-radius: 10px; background: rgba(255,255,255,.06); }
+    #teamBox .fwrap { flex: 1; display: flex; flex-direction: column; }
+    #teamBox .field { position: relative; flex: 1; min-height: 300px; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255,255,255,.75);
+      background: linear-gradient(to bottom, rgba(255,255,255,.08) 0 14%, transparent 14%), repeating-linear-gradient(to bottom, #2f8a43 0 10%, #348f48 10% 20%); }
+    #teamBox .field::before { content: ''; position: absolute; left: 0; right: 0; top: 14%; border-top: 2px solid rgba(255,255,255,.75); }   /* エンドゾーンの線 */
+    #teamBox .field .dir { position: absolute; right: 8px; top: 4px; font-size: 11px; color: rgba(255,255,255,.8); }
+    #teamBox .pl { display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; color: #fff; text-align: center; line-height: 1.15; }
+    #teamBox .field .pl { position: absolute; transform: translate(-50%, -50%); }
+    #teamBox .pl .ph { position: relative; width: 54px; height: 54px; border-radius: 50%; transition: transform .12s; }
+    #teamBox .pl .ph img { width: 54px; height: 54px; display: block; border-radius: 50%; }
+    #teamBox .pl.sel .ph { transform: scale(1.12); box-shadow: 0 0 0 3px #FFE650, 0 0 14px 4px rgba(255,230,80,.6); }
+    #teamBox .pl { touch-action: none; } #teamBox .pl .ph img { -webkit-user-drag: none; } #teamBox .pl.drag { opacity: .35; }
+    #teamBox .pl.drop .ph { transform: scale(1.15); box-shadow: 0 0 0 3px #FFE650, 0 0 14px 4px rgba(255,230,80,.6); }   /* ここで離すと入れ替わる */
+    #tmGhost { position: fixed; z-index: 40; pointer-events: none; width: 62px; height: 62px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 6px 18px rgba(0,0,0,.55); }
+    #teamBox .pl b { font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,.8); white-space: nowrap; } #teamBox .pl small { font-size: 10px; color: #E6E9FF; text-shadow: 0 1px 2px rgba(0,0,0,.8); white-space: nowrap; } #teamBox .pl small i { font-style: normal; color: #FFE650; }
+    @media (max-height: 460px) { #teamBox h3, #teamBox .note { display: none; } #teamBox .pv .cv { display: none; } #teamBox .pv { padding: 4px 8px; font-size: 11px; } #teamBox .tbar { margin-bottom: 2px; }
+      #teamBox .field { min-height: 205px; } #teamBox .pl .ph, #teamBox .pl .ph img { width: 40px; height: 40px; } #teamBox .pl b { font-size: 11px; } #teamBox .bench .list { gap: 2px; padding: 2px 0; } #teamBox .btns { padding: 6px 0 8px; } }
+    #pvBox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 30; background: rgba(4,8,20,.72); }
+    #pvBox .fr { position: relative; width: min(960px, 96vw); height: min(600px, 92vh); border-radius: 14px; overflow: hidden; background: #0f1830; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+    #pvBox iframe { width: 100%; height: 100%; border: 0; display: block; }
+    #pvBox .x { position: absolute; top: 8px; left: 8px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(16,24,48,.85); color: #fff; font-size: 20px; cursor: pointer; }
+    #teamBox .btns { display: flex; gap: 10px; justify-content: space-between; margin: 6px 0 0; position: sticky; bottom: -10px; padding: 8px 0 10px; background: rgba(20,30,58,.97); }   /* 決定（試合開始）ボタンは、スクロールしなくてもいつも下に見える */
+    #teamBox .btns button { font: inherit; font-size: 14px; color: #fff; border: 0; border-radius: 9px; padding: 8px 18px; background: #7889FB; cursor: pointer; } #teamBox .btns button.sub { background: rgba(255,255,255,.18); }`;
+  function mount() { if (!box.isConnected) { document.head.appendChild(css); document.body.appendChild(box); document.body.appendChild(pv); } }
+  // 選手を見る小窓（2026-11-21）。アイコンをタップで開く
+  const pv = document.createElement('div'); pv.id = 'pvBox';
+  const VIEWER = /\/\d{8}_[^/]*$/.test(decodeURI(location.pathname)) ? '20261121_選手ビュー_v1.html' : 'viewer.html';   // このフォルダの版とスマホ用・公開用で名前が違う
+  function openPlayer(n, st) {
+    const q = new URLSearchParams({ n, color: st.color, design: st.design, name: st.name || '' });
+    pv.innerHTML = `<div class="fr"><iframe src="${VIEWER}?${q}" title="選手を見る"></iframe><button class="x" aria-label="閉じる">✕</button></div>`;
+    pv.style.display = 'flex';
+    const close = (e) => { if (e) e.stopPropagation(); pv.style.display = 'none'; pv.innerHTML = ''; removeEventListener('keydown', esc, true); };   // 閉じたら 3D も止める（小窓ごと消す）
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    pv.querySelector('.x').addEventListener('click', close);
+    pv.addEventListener('click', (e) => { if (e.target === pv) close(e); }, { once: true });
+    addEventListener('keydown', esc, true);
+  }
+
+  function open(opt = {}) {
+    mount();
+    let st = load(), sel = null;
+    const all10 = DEF.starters[0].concat(DEF.bench[0]);
+    // 選手1人（アイコン＋名前＋役割と総合）。pos: フィールドの中の位置 [横%, 縦%]（ベンチは無し）
+    const card = (n, pos) => `<div class="pl${sel === n ? ' sel' : ''}" data-n="${n}"${pos ? ` style="left:${pos[0]}%;top:${pos[1]}%"` : ''}><span class="ph"><img src="assets/ui/icons/icon_${st.color}_${n}.png" alt="" draggable="false"></span><b>#${n} ${R[0][n].name}</b><small>${ROLE[R[0][n].role]} <i>${overall(n)}</i></small></div>`;
+    // フィールドの並べ方: 奥＝ディープ、真ん中＝カッター、手前＝ハンドラー。同じ役割は横に等しく並べる
+    const ROW_Y = { D: 27, C: 55, H: 82 };
+    const fieldCards = () => ['D', 'C', 'H'].map((rl) => { const ns = st.starters.filter((n) => R[0][n].role === rl); return ns.map((n, k) => card(n, [(k + 1) / (ns.length + 1) * 100, ROW_Y[rl]])).join(''); }).join('');
+    const draw = () => {
+      const bench = all10.filter((n) => !st.starters.includes(n)), cnt = (r) => st.starters.filter((n) => R[0][n].role === r).length;
+      const col = COLORS[st.color];
+      box.innerHTML = `<div class="pn"><h3>${opt.lineup ? 'スタメン' : 'チーム'}</h3>`
+        + (opt.lineup ? '' : ``   // 試合前（lineup）は、チーム名とユニフォームを出さない（2026-11-21）
+        + `<div class="tbar"><label>チーム名 <input maxlength="10" placeholder="あなた" value="${st.name.replace(/"/g, '&quot;')}"></label>`
+        + `<span>色 ${Object.entries(COLORS).map(([k, c]) => `<button class="chip${k === st.color ? ' on' : ''}" data-c="${k}" title="${c.name}" style="background:rgb(${c.top.join(',')})"></button>`).join(' ')} ${col.name}</span></div>`
+        + `<div class="tbar">柄 ${[['cr_ivory', 'クラシック'], ['prestige', '上品'], ['pins', 'グラデーション'], ['side', 'サイドパネル'], ['topo', '等高線']].map(([k, lb]) => `<button class="pv${k === st.design ? ' on' : ''}" data-d="${k}"><span class="cv"></span>${lb}</button>`).join(' ')}<span style="font-size:11px;color:#C7CDFD">チーム名を英字にすると胸に入る</span></div>`)
+        + `<p class="note">アイコンをドラッグして相手の上で離すと入れ替わる（ベンチ ⇔ フィールド）　／　タップで詳しく見る　／　いま ハンドラー${cnt('H')}・カッター${cnt('C')}・ディープ${cnt('D')}</p>`
+        + `<div class="lay"><div class="bench"><h4>ベンチ（控え3人）</h4><div class="list">${bench.map((n) => card(n)).join('')}</div></div>`
+        + `<div class="fwrap"><h4>フィールド（先発7人）</h4><div class="field"><span class="dir">↑ 攻める向き</span>${fieldCards()}</div></div></div>`
+        + `<div class="btns"><button class="sub" data-a="reset">最初の形に戻す</button><button data-a="ok">${opt.ok || '決定'}</button></div></div>`;
+      const inp = box.querySelector('input');
+      if (inp) { inp.addEventListener('input', () => { st.name = inp.value.trim(); }); inp.addEventListener('keydown', (e) => e.stopPropagation()); }   // 試合のキー操作に流さない
+      box.querySelectorAll('.pv').forEach((b) => {   // 柄の見本（ユニフォームの素材が読めていれば）
+        const cv = window.Uniform && Uniform.preview(b.dataset.d, st.color, 54); if (cv) b.querySelector('.cv').appendChild(cv);
+        b.addEventListener('click', (e) => { e.stopPropagation(); st.design = b.dataset.d; draw(); });
+      });
+      box.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); st.color = b.dataset.c; draw(); }));
+      // 選手: ドラッグ＝入れ替え（ベンチ ⇔ フィールドの選手の上で離す）／動かさずに離す（タップ）＝選手を見る（2026-11-21）
+      box.querySelectorAll('.pl').forEach((b) => {
+        b.addEventListener('click', (e) => e.stopPropagation());
+        b.addEventListener('pointerdown', (e) => {
+          e.stopPropagation(); e.preventDefault();
+          const n = +b.dataset.n, x0 = e.clientX, y0 = e.clientY; let gh = null, over = null;
+          const target = (x, y) => {   // 離したら入れ替わる相手（ベンチの人ならフィールドの人、フィールドの人ならベンチの人）
+            const el = document.elementFromPoint(x, y), p = el && el.closest ? el.closest('#teamBox .pl') : null;
+            return p && +p.dataset.n !== n && st.starters.includes(+p.dataset.n) !== st.starters.includes(n) ? p : null;
+          };
+          const move = (ev) => {
+            if (!gh) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return; gh = b.querySelector('img').cloneNode(); gh.id = 'tmGhost'; document.body.appendChild(gh); b.classList.add('drag'); }
+            gh.style.left = ev.clientX + 'px'; gh.style.top = ev.clientY + 'px';
+            const p = target(ev.clientX, ev.clientY);
+            if (p !== over) { if (over) over.classList.remove('drop'); over = p; if (over) over.classList.add('drop'); }
+          };
+          const up = (ev) => {
+            removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+            if (!gh) { if (ev.type === 'pointerup') openPlayer(n, st); return; }   // 動かさずに離した＝タップ
+            gh.remove(); b.classList.remove('drag');
+            if (over) { const m = +over.dataset.n, out = st.starters.includes(n) ? n : m, inn = out === n ? m : n; st.starters[st.starters.indexOf(out)] = inn; }
+            draw();
+          };
+          addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+        });
+      });
+      box.querySelector('[data-a=reset]').addEventListener('click', (e) => { e.stopPropagation(); if (opt.lineup) st.starters = def().starters; else st = def(); sel = null; draw(); });   // 試合前は先発だけ戻す
+      box.querySelector('[data-a=ok]').addEventListener('click', (e) => { e.stopPropagation(); save(st); box.style.display = 'none'; if (opt.onDone) opt.onDone(st); });
+    };
+    draw();
+    box.style.display = 'flex';
+    if (window.Uniform && !Uniform.isReady()) Uniform.ready.then(() => { if (box.style.display === 'flex') draw(); });   // 見本はあとから
+  }
+  window.TeamUI = { open, load, COLORS, openPlayer, isOpen: () => box.style.display === 'flex' || pv.style.display === 'flex' };
+})();
+
+</script>
+<script>
+/* ============================================================
+ * render3d.js ― 試合の「背景・フィールド・選手」を three.js（本物の3D）で描く
+ *
+ * なぜ: これまでの試合は、自作の簡易3D（棒人間）で描いていた。3D試作 v3 で作った
+ *       「身長1.78mの人＋走りの動き＋体の傾き＋切り返し」を、試合にそのまま載せる。
+ * しくみ:
+ *   - 試合の計算（match.js）は一切変えない。毎フレーム、選手の位置とカメラを受け取って描くだけ
+ *   - WebGL の画面を一番下に置き、その上に今までの 2D の画面（ディスク・番号札・HUD）を透明で重ねる
+ *   - 選手の動き方: 位置の変化から速さ・向き・加速を求め、走り／後ろ走り／横すり足／待機を混ぜる。
+ *     足の運びは「歩幅で割った分だけ進める」ので地面を滑らない（3D試作 v3 と同じ考え方）
+ *   - 読み込み（約10MB）が終わるまでは、今までの描き方のまま動く
+ *
+ *   座標: 試合は x=横, y=縦, z=高さ。three.js は (x, z, -y) に置き換える
+ * ============================================================ */
+(function () {
+  'use strict';
+  const R3D = window.R3D = { ready: false, error: null, progress: 0 };
+  const RIG_REST = 'assets/mocap/rig_rest.json';   // 骨の向きの基準（Mixamo のファイルは 2026-11-19 から読まない）
+  const VRM_BODIES = { m: 'assets/vroid/vroid_m.vrm', l: 'assets/vroid/vroid_l.vrm', f: 'assets/vroid/vroid_f.vrm' };   // 林さんが VRoid で作った体（標準男性・大柄・女性。無い体は標準男性）
+  const HEIGHT = 1.78;
+
+  (async function boot() {
+    let THREE, GLTFLoader, SkeletonUtils;
+    try {
+      THREE = await import('three');
+      ({ GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'));
+      SkeletonUtils = await import('three/addons/utils/SkeletonUtils.js');
+    } catch (e) { R3D.error = '3Dの部品を読み込めない（ネット接続を確認）: ' + e; return; }
+
+    // ---------------- 画面 ----------------
+    const glc = document.getElementById('gl');
+    const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, powerPreference: 'high-performance' });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    const SKY = new THREE.Color(0x5d9bea);   // 空の筒の一番上の色とそろえる（境目の線が出ないように）
+    scene.background = SKY;
+    scene.fog = new THREE.Fog(0xd6e5f0, 70, 260);
+    const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
+    scene.add(new THREE.HemisphereLight(0xdfefff, 0x5a8a45, 1.05));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 140 });
+    sun.shadow.bias = -0.0005;
+    scene.add(sun); scene.add(sun.target);
+    const W3 = (x, y, z = 0) => new THREE.Vector3(x, z, -y);   // 試合の座標 → three.js
+
+    // ---------------- 空・遠くの山（遠近感の手がかり） ----------------
+    {
+      const c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 0, 1024);
+      grad.addColorStop(0, '#5d9bea'); grad.addColorStop(0.55, '#8fbcef'); grad.addColorStop(0.93, '#b9d8f5'); grad.addColorStop(1, '#e8f1fb');
+      g.fillStyle = grad; g.fillRect(0, 0, 2048, 1024);
+      for (const [amp, col, off] of [[70, '#b3c6d8', 1.3], [45, '#93ac9e', 4.1]]) {
+        g.fillStyle = col; g.beginPath(); g.moveTo(0, 1024);
+        for (let x = 0; x <= 2048; x += 8) {
+          const a = x / 2048 * Math.PI * 2;
+          const h = amp * (0.55 + 0.25 * Math.sin(a * 3 + off) + 0.15 * Math.sin(a * 7 + off * 2) + 0.05 * Math.sin(a * 17 + off * 3));
+          g.lineTo(x, 990 - h * 1.4);
+        }
+        g.lineTo(2048, 1024); g.closePath(); g.fill();
+      }
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = THREE.RepeatWrapping;
+      const sky = new THREE.Mesh(new THREE.CylinderGeometry(900, 900, 1400, 48, 1, true),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false }));
+      sky.position.set(18.5, 640, -50); scene.add(sky);
+      R3D.sky = sky;
+    }
+
+    // ---------------- 地面・フィールド ----------------
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1800, 1800), new THREE.MeshLambertMaterial({ color: 0x4f8a3c }));
+    ground.rotation.x = -Math.PI / 2; ground.position.set(18.5, -0.01, -50); ground.receiveShadow = true; scene.add(ground);
+    {
+      // フィールド（5m ごとの市松・エンドゾーンは濃い緑・白線）を1枚の絵にして貼る
+      const PX = 20, c = document.createElement('canvas'); c.width = 37 * PX; c.height = 100 * PX;
+      const g = c.getContext('2d');
+      for (let y = 0; y < 100; y += 5) for (let x = 0; x < 37; x += 5) {
+        const ez = y < 18 || y >= 82, odd = ((x / 5) + (y / 5)) % 2 === 1;
+        g.fillStyle = ez ? (odd ? '#489644' : '#54a44f') : (odd ? '#58a648' : '#68b656');
+        g.fillRect(x * PX, (100 - y - 5) * PX, Math.min(5, 37 - x) * PX, 5 * PX);
+      }
+      g.fillStyle = '#f4f4f4';
+      const L = (x0, y0, x1, y1) => g.fillRect(x0 * PX, (100 - y1) * PX, (x1 - x0) * PX, (y1 - y0) * PX);
+      const LW = 0.08;
+      L(0, 0, LW, 100); L(37 - LW, 0, 37, 100); L(0, 0, 37, LW); L(0, 100 - LW, 37, 100);
+      L(0, 18 - LW / 2, 37, 18 + LW / 2); L(0, 82 - LW / 2, 37, 82 + LW / 2);
+      for (const by of [38, 62]) { L(18, by - LW / 2, 19, by + LW / 2); L(18.5 - LW / 2, by - 0.5, 18.5 + LW / 2, by + 0.5); }
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+      const field = new THREE.Mesh(new THREE.PlaneGeometry(37, 100), new THREE.MeshLambertMaterial({ map: tex }));
+      field.rotation.x = -Math.PI / 2; field.position.set(18.5, 0.002, -50); field.receiveShadow = true; scene.add(field);
+    }
+    // 周りの木（遠近感）とコーン
+    {
+      let seed = 7; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const trunkG = new THREE.CylinderGeometry(0.25, 0.3, 1, 6), leafG = new THREE.SphereGeometry(1, 8, 6);
+      const N = 90, trunk = new THREE.InstancedMesh(trunkG, new THREE.MeshLambertMaterial({ color: 0x5b4632 }), N);
+      const leaf = new THREE.InstancedMesh(leafG, new THREE.MeshLambertMaterial({ color: 0x3a6b3a }), N);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+      for (let i = 0; i < N; i++) {
+        const a = i / N * Math.PI * 2 + r() * 0.05, rad = 95 + r() * 40, h = 7 + r() * 6, w = 2.5 + r() * 2;
+        const x = 18.5 + Math.cos(a) * rad * 0.8, y = 50 + Math.sin(a) * rad;
+        m.compose(W3(x, y, h * 0.25), q, new THREE.Vector3(1, h * 0.5, 1)); trunk.setMatrixAt(i, m);
+        m.compose(W3(x, y, h * 0.62), q, new THREE.Vector3(w, h * 0.42, w)); leaf.setMatrixAt(i, m);
+        leaf.setColorAt(i, new THREE.Color(r() < 0.5 ? 0x2f5d34 : 0x3a6b3a));
+      }
+      scene.add(trunk); scene.add(leaf);
+      const cones = [[0, 0], [37, 0], [0, 18], [37, 18], [0, 82], [37, 82], [0, 100], [37, 100]].map((c) => [c[0], c[1], 0.3]);
+      for (let y = 28; y <= 72; y += 10) { cones.push([-0.8, y, 0.18]); cones.push([37.8, y, 0.18]); }
+      const coneG = new THREE.ConeGeometry(0.14, 1, 10), coneM = new THREE.MeshLambertMaterial({ color: 0xf77525 });
+      for (const c of cones) { const k = new THREE.Mesh(coneG, coneM); k.scale.set(c[2] / 0.3, c[2], c[2] / 0.3); k.position.copy(W3(c[0], c[1], c[2] / 2)); scene.add(k); }
+    }
+
+    // ---------------- 選手の読み込み ----------------
+    let RIG;
+    try { RIG = await (await fetch(RIG_REST)).json(); } catch (e) { R3D.error = '骨の向きの基準（rig_rest.json）を読み込めない: ' + e; return; }
+    const clips = {};
+    // 林さんの動画から切り出した動き
+    //   userData.release: 手を離す（捕る）瞬間が、動きの始まりから何秒後か
+    const MOCAP = {};
+    for (const n of ['throw_backhand', 'throw_forehand', 'catch', 'catch_2', 'catch_3', 'jump_catch', 'hold_fb', 'hold_fh', 'hold_hb']) {
+      try {
+        const r = await fetch('assets/mocap/clip_' + n + '.json');
+        if (!r.ok) continue;
+        const j = await r.json();
+        const c = THREE.AnimationClip.parse(j); c.name = 'mc_' + n;
+        clips[c.name] = c; MOCAP[n] = { name: c.name, release: (j.userData && j.userData.release) || 0.4, dur: c.duration };
+      } catch (e) { /* 無ければ使わない */ }
+    }
+    R3D.mocap = MOCAP;
+    // 後ろ走り・横走り・待つ動き（100STYLE。The 100STYLE Dataset - Ian Mason, CC BY 4.0）と、ジョグ・全力走・守りの構え・喜ぶ（CMU Graphics Lab Motion Capture Database）
+    R3D.loco = [];
+    const LOCO_FILE = { celebrate: 'once_celebrate.json', dive: 'clip_dive.json' };   // 飛びつきは AI（Dreamina）で作った動画から（2026-11-19〜）
+    for (const n of ['jog', 'sprint', 'backpedal', 'strafe_left', 'strafe_right', 'idle', 'defense_idle', 'celebrate', 'dive']) {   // 全力走・守りの構え・喜ぶは CMU（2026-11-19〜）
+      try {
+        const r = await fetch('assets/mocap/' + (LOCO_FILE[n] || 'loco_' + n + '.json'));
+        if (!r.ok) continue;
+        const c = THREE.AnimationClip.parse(await r.json()); c.name = n;
+        clips[n] = c; R3D.loco.push(n);
+      } catch (e) { /* 無ければ使わない */ }
+    }
+    // 振りかぶりにかかる時間（試合側は、この時間だけ待ってから手を離す）
+    // 動画に無い投げは、腕の振りの向きが近い動画の投げで見せる（ハンマー・ハイフォア・ヘリ → フォアハンド、スクーバ → バックハンド）
+    const THROW_AS = { hammer: 'forehand', highfore: 'forehand', heli: 'forehand', scoober: 'backhand' };
+    const throwMocap = (type) => MOCAP['throw_' + type] || MOCAP['throw_' + (THROW_AS[type] || 'forehand')];
+    R3D.windupTime = (type) => { const m = throwMocap(type); return m ? m.release : 0; };
+
+    // ---------------- VRoid の体を、Mixamo の骨の名前・向きに組み直す ----------------
+    const MIX2VROID = [
+      ['Hips', 'J_Bip_C_Hips'], ['Spine', 'J_Bip_C_Spine'], ['Spine1', 'J_Bip_C_Chest'], ['Spine2', 'J_Bip_C_UpperChest'], ['Neck', 'J_Bip_C_Neck'], ['Head', 'J_Bip_C_Head'],
+    ];
+    for (const [S, s2] of [['Left', 'L'], ['Right', 'R']]) {
+      MIX2VROID.push([S + 'Shoulder', `J_Bip_${s2}_Shoulder`], [S + 'Arm', `J_Bip_${s2}_UpperArm`], [S + 'ForeArm', `J_Bip_${s2}_LowerArm`], [S + 'Hand', `J_Bip_${s2}_Hand`],
+        [S + 'UpLeg', `J_Bip_${s2}_UpperLeg`], [S + 'Leg', `J_Bip_${s2}_LowerLeg`], [S + 'Foot', `J_Bip_${s2}_Foot`], [S + 'ToeBase', `J_Bip_${s2}_ToeBase`]);
+      for (const [f, f2] of [['Thumb', 'Thumb'], ['Index', 'Index'], ['Middle', 'Middle'], ['Ring', 'Ring'], ['Pinky', 'Little']]) for (let k = 1; k <= 3; k++) MIX2VROID.push([`${S}Hand${f}${k}`, `J_Bip_${s2}_${f2}${k}`]);
+    }
+    function rebindToMixamo(vScene, rig) {   // rig: 骨の向きの基準（rig_rest.json）
+      vScene.updateMatrixWorld(true);
+      const vB = {};
+      vScene.traverse((o) => { if (o.isBone) vB[o.name] = o; });
+      const want = new Map();   // VRoid の骨 → そろえたい向き（基準の、立った姿勢での向き）
+      for (const [mx, vr] of MIX2VROID) { const q = rig.bones['mixamorig' + mx], tb = vB[vr]; if (q && tb) { want.set(tb, new THREE.Quaternion().fromArray(q)); tb.userData.mx = 'mixamorig' + mx; } }
+      const hipsT = vB.J_Bip_C_Hips;
+      if (!rig.bones.mixamorigHips || !hipsT) return false;
+      if (hipsT.parent && hipsT.parent.isBone) want.set(hipsT.parent, new THREE.Quaternion().fromArray(rig.hipsParent));   // 腰の親も、基準の腰の親の向きに
+      const W = new Map(); vScene.traverse((o) => { if (o.isBone) W.set(o, { p: o.getWorldPosition(new THREE.Vector3()), q: o.getWorldQuaternion(new THREE.Quaternion()) }); });
+      const visit = (o) => {
+        if (o.isBone) {   // 位置（世界での位置）はそのまま、向きだけ変える
+          const w = W.get(o), q = want.get(o) || w.q, par = o.parent;
+          par.updateMatrixWorld(true);
+          const pInv = par.matrixWorld.clone().invert(), pq = par.getWorldQuaternion(new THREE.Quaternion()).invert();
+          o.quaternion.copy(pq.multiply(q)); o.position.copy(w.p.clone().applyMatrix4(pInv)); o.updateMatrixWorld(true);
+        }
+        for (const c of o.children) visit(c);
+      };
+      visit(vScene);
+      vScene.updateMatrixWorld(true);
+      vScene.traverse((o) => { if (o.isSkinnedMesh) o.skeleton.calculateInverses(); });   // 組み直した骨で、体を貼り直す
+      for (const [t] of want) if (t.userData.mx) t.name = t.userData.mx;   // 名前を Mixamo に
+      // 頭のてっぺんの骨（小物を付ける所）
+      const top = new THREE.Box3().setFromObject(vScene).max.y, head = vB.J_Bip_C_Head;
+      const hw = head.getWorldPosition(new THREE.Vector3()), tb = new THREE.Bone(); tb.name = 'mixamorigHeadTop_End';
+      head.add(tb); tb.position.copy(head.worldToLocal(new THREE.Vector3(hw.x, top, hw.z))); vScene.updateMatrixWorld(true);
+      // 腰の位置の動きの縮め方（Mixamo の腰の高さ → VRoid の腰の高さ）
+      return hipsT.position.length() / Math.max(1e-6, rig.hipsLen);
+    }
+    // 体ごとに { scene, clips（腰の上下の動きを体に合わせたもの）, SCALE } を持つ
+    function bodyScale(sc) { sc.updateMatrixWorld(true); const q = new THREE.Vector3(); let top = 0;
+      sc.traverse((o) => { if (/HeadTop_End$/.test(o.name)) { o.getWorldPosition(q); top = q.y; } });
+      return top > 0 ? HEIGHT / top : 0.01; }
+    const BODY = {};
+    for (const [key, url] of Object.entries(VRM_BODIES)) {
+      try {
+        const vg = await new Promise((res, rej) => new GLTFLoader().load(url, res, key === 'm' ? (e) => { if (e.total) R3D.progress = e.loaded / e.total; } : undefined, rej));
+        const k = rebindToMixamo(vg.scene, RIG);
+        if (!k) continue;
+        const bc = {};
+        for (const [n, c] of Object.entries(clips)) {
+          if (!c.tracks.some((t) => /^mixamorigHips\.position$/.test(t.name))) { bc[n] = c; continue; }
+          const c2 = c.clone();
+          for (const t of c2.tracks) if (/^mixamorigHips\.position$/.test(t.name)) for (let i = 0; i < t.values.length; i++) t.values[i] *= k;
+          bc[n] = c2;
+        }
+        BODY[key] = { scene: vg.scene, clips: bc, SCALE: bodyScale(vg.scene) };
+      } catch (e) { console.warn('VRoid の体を読めない: ' + key, e); }
+    }
+    const DEF = BODY.m;
+    if (!DEF) { R3D.error = '選手の体（assets/vroid/vroid_m.vrm）を読み込めない'; return; }
+    R3D.body = 'vroid';
+    R3D.bodies = Object.keys(BODY);
+    const bodyOf = (pl) => (pl && pl.r && BODY[pl.r.body]) || DEF;
+    const base = DEF.scene, SCALE = DEF.SCALE;
+    // 動きの本来の速さ（axis: 'z' 前後 / 'x' 左右）: 接地中の足が動く速さの中央値
+    function measureSpeed(clip, axis = 'z') {
+      const obj = SkeletonUtils.clone(base); obj.scale.setScalar(SCALE);
+      const mixer = new THREE.AnimationMixer(obj); mixer.clipAction(clip).play();
+      const feet = []; obj.traverse((o) => { if (/(Left|Right)ToeBase$/.test(o.name)) feet.push(o); });
+      const N = 120, dt = clip.duration / N, ys = feet.map(() => []), hs = feet.map(() => []), q = new THREE.Vector3();
+      for (let i = 0; i <= N; i++) { mixer.setTime(i * dt); obj.updateMatrixWorld(true); feet.forEach((f, k) => { f.getWorldPosition(q); ys[k].push(q.y); hs[k].push(q[axis]); }); }
+      const vs = [];
+      feet.forEach((f, k) => { const minY = Math.min(...ys[k]); for (let i = 1; i < N; i++) if (ys[k][i] < minY + 0.025) vs.push(Math.abs(hs[k][i + 1] - hs[k][i - 1]) / (2 * dt)); });
+      vs.sort((a, b) => a - b); return vs.length ? Math.max(0.5, vs[vs.length >> 1]) : 3;
+    }
+    const LOCO = ['jog', 'sprint', 'backpedal', 'strafe_left', 'strafe_right'];
+    const NAT = {};
+    for (const n of LOCO) NAT[n] = measureSpeed(DEF.clips[n], /strafe/.test(n) ? 'x' : 'z');
+    const STRIDE = {}; for (const n of LOCO) STRIDE[n] = NAT[n] * clips[n].duration;
+    R3D.NAT = NAT;
+
+    // チームの服の色。元の服の画像は濃い灰色なので、色を掛けるだけでは暗いままで見分けにくい。
+    // そこで画像の「明るさの濃淡（しわ・縫い目）」だけを取り出し、明るく持ち上げてからチームの色で塗り直す
+    const TEAM_WEAR = [
+      { top: (window.UFPS_WEAR0 || {}).top || [40, 105, 255], bottom: (window.UFPS_WEAR0 || {}).bottom || [235, 238, 245] },   // 青（あなたのチーム）: 初めは青いシャツ＋白い短パン。チームの画面で色を変えられる
+      { top: [230, 50, 45], bottom: [35, 35, 40] },       // 赤: 赤いシャツ＋黒い短パン
+    ];
+    const recolorCache = new Map();
+    // ===== 髪と目を鮮やかに（2026-11-20）=====
+    const sat = (c, k) => { const m = (c[0] + c[1] + c[2]) / 3; return c.map((v) => Math.max(0, Math.min(255, m + (v - m) * k))); };   // 彩度を上げる
+    const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    // 髪: 根元（画像の上）は深い色 → 毛先（下）はパーソナルカラーを混ぜた明るい色。根元から 1/4 の所に光の帯
+    function vividHair(tex, rgb, tip) {
+      const key = 'vh' + tex.uuid + rgb.join(',') + '/' + tip.join(',');
+      if (recolorCache.has(key)) return recolorCache.get(key);
+      const img = tex.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height), px = d.data, W = c.width, H = c.height;
+      let sum = 0, n = 0; for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 0) { sum += 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]; n++; }
+      const k = 0.66 * 255 / Math.max(1, sum / Math.max(1, n));
+      const dark = rgb[0] + rgb[1] + rgb[2] < 160;   // 黒髪は、毛先に色を足すと茶色っぽく見えるので、青みの光にする
+      const baseC = sat(rgb, 1.35), rootC = baseC.map((v) => v * 0.78), tipC = sat(mix3(baseC, dark ? [70, 90, 150] : tip, dark ? 0.6 : 0.42).map((v) => v * 1.12 + 18), 1.15);
+      for (let y = 0; y < H; y++) {
+        const v = y / (H - 1), t = Math.max(0, Math.min(1, (v - 0.35) / 0.6));
+        const col = v < 0.35 ? mix3(rootC, baseC, v / 0.35) : mix3(baseC, tipC, t * t * (3 - 2 * t));
+        const ring = Math.max(0, 1 - Math.abs(v - 0.24) / 0.05) * 0.5;   // 光の帯
+        for (let x = 0; x < W; x++) {
+          const i = (y * W + x) * 4; if (px[i + 3] === 0) continue;
+          const l = Math.max(0.25, Math.min(1.2, (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) * k / 255));
+          const cc = mix3(col.map((q) => q * l), [255, 255, 255], ring * l);
+          px[i] = Math.min(255, cc[0]); px[i + 1] = Math.min(255, cc[1]); px[i + 2] = Math.min(255, cc[2]);
+        }
+      }
+      g.putImageData(d, 0, 0);
+      const t2 = new THREE.CanvasTexture(c); t2.flipY = tex.flipY; t2.colorSpace = tex.colorSpace; t2.wrapS = tex.wrapS; t2.wrapT = tex.wrapT;
+      recolorCache.set(key, t2); return t2;
+    }
+    // 目（黒目）: 暗い所は深い色、明るい所は白へ寄せて輝きを出す
+    function vividIris(tex, rgb) {
+      const key = 'vi' + tex.uuid + rgb.join(',');
+      if (recolorCache.has(key)) return recolorCache.get(key);
+      const img = tex.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+      let lo = 255, hi = 0; for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) { const l = 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]; lo = Math.min(lo, l); hi = Math.max(hi, l); }
+      const C = sat(rgb, 1.4), deep = C.map((v) => v * 0.28), bright = mix3(C.map((v) => Math.min(255, v * 1.25 + 20)), [255, 255, 255], 0.35);
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i + 3] === 0) continue;
+        const t = Math.max(0, Math.min(1, ((0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) - lo) / Math.max(1, hi - lo)));
+        const cc = t < 0.55 ? mix3(deep, C, t / 0.55) : mix3(C, bright, (t - 0.55) / 0.45);
+        px[i] = cc[0]; px[i + 1] = cc[1]; px[i + 2] = cc[2];
+      }
+      g.putImageData(d, 0, 0);
+      const t2 = new THREE.CanvasTexture(c); t2.flipY = tex.flipY; t2.colorSpace = tex.colorSpace; t2.wrapS = tex.wrapS; t2.wrapT = tex.wrapT;
+      recolorCache.set(key, t2); return t2;
+    }
+    function recolor(tex, rgb, target, floor = 0) {   // floor: いちばん暗くてもこの倍率まで（服で使う）
+      const key = tex.uuid + rgb.join(',') + '/' + floor;
+      if (recolorCache.has(key)) return recolorCache.get(key);
+      const img = tex.image, c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+      let sum = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 0) { sum += 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]; n++; }
+      let base = sum / Math.max(1, n);   // 平均の明るさを target にそろえる
+      if (floor > 0) {   // 服: 真ん中の明るさ（中央値）を基準にする（真っ黒な所に引っぱられないように）
+        const hist = new Uint32Array(256); for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 0) hist[Math.round(0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2])]++;
+        let acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n / 2) { base = v; break; } }
+      }
+      const k = target / Math.max(1, base);
+      for (let i = 0; i < px.length; i += 4) {
+        const l = Math.max(floor, Math.min(1.15, (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) * k / 255));
+        px[i] = Math.min(255, rgb[0] * l); px[i + 1] = Math.min(255, rgb[1] * l); px[i + 2] = Math.min(255, rgb[2] * l);
+      }
+      g.putImageData(d, 0, 0);
+      const t = new THREE.CanvasTexture(c);
+      t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+      recolorCache.set(key, t);
+      return t;
+    }
+    // 靴を、紺（甲）＋白（ソール）＋金（横の帯）に塗り分ける（2026-11-20）
+    function shoeMap(tex, navy, white, gold) {
+      const key = tex.uuid + '|shoe|' + navy.join() + white.join() + gold.join();
+      if (recolorCache.has(key)) return recolorCache.get(key);
+      const img = tex.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height), px = d.data, W = c.width, H = c.height, sx = W / 256, sy = H / 256;
+      for (let i = 0; i < px.length; i += 4) {
+        if (!px[i + 3]) continue;
+        const x = (i / 4) % W / sx, y = Math.floor(i / 4 / W) / sy, L = (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) / 255;
+        const t = Math.max(0, Math.min(1, (L - 0.35) / 0.3)), sm = t * t * (3 - 2 * t);   // 0＝暗い所（甲）, 1＝明るい所（白）
+        const stripe = y >= 150 && y < 178 && (x < 108 || x > 148) && x > 55 && x < 200 && L > 0.5;   // 甲を横切る帯
+        const lo = navy.map((v) => v * (1.0 + L * 2.2)), hi = (stripe ? gold : white).map((v) => v * Math.min(1.05, 0.55 + L * 0.5));
+        for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, lo[k] * (1 - sm) + hi[k] * sm);
+      }
+      g.putImageData(d, 0, 0);
+      const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+      recolorCache.set(key, t); return t;
+    }
+    // 手に持つディスク（直径27cm・厚さ3cmの白い円盤＋青い縁）。右手の骨の子にして、手と一緒に動かす
+    //   右手の骨は「指の向き＝+Y、親指の側＝+X、手のひらの側＝+Z」。
+    //   林さんの写真の握り: 縁が指の付け根（手のひら）に当たり、4本の指は片面に平らに添い、親指が反対の面を押さえる。
+    //   → 円盤は指の腹のすぐ外（+Z へ2cm）に手のひらと平行に置き、縁が指の付け根（指の向きへ約9cm）に来るよう
+    //     中心を指の向きへ22.7cm・親指側へ2cm にする。親指は少し閉じて、先が反対の面に当たるようにする
+    //   （tools/grip_test.html で手のアップを見ながら決めた）
+    const HELD_DISC = (() => {
+      const g = new THREE.Group();
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.137, 0.13, 0.02, 32), new THREE.MeshLambertMaterial({ color: 0xf6f6f2 }));
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.128, 0.011, 8, 40), new THREE.MeshLambertMaterial({ color: 0x3b6cff }));
+      rim.rotation.x = Math.PI / 2; rim.position.y = -0.008;
+      const logo = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), new THREE.MeshLambertMaterial({ color: 0x7889fb }));
+      logo.rotation.x = -Math.PI / 2; logo.position.y = 0.0105;
+      g.add(top); g.add(rim); g.add(logo);
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      return g;
+    })();
+    function attachDisc(obj, SCALE) {
+      let hand = null; obj.traverse((o) => { if (/RightHand$/.test(o.name)) hand = o; });
+      if (!hand) return null;
+      const d = HELD_DISC.clone();
+      const U = 1 / SCALE;                         // 骨の中の 1m の長さ
+      d.scale.setScalar(U);
+      d.position.set(0.02 * U, 0.227 * U, 0.02 * U);
+      d.rotation.set(Math.PI / 2, 0, 0);            // 円盤の軸（Y）を手のひらの向き（Z）へ
+      d.visible = false;
+      hand.add(d);
+      // 親指の曲げ（持っているときだけ）。指の動きは動画にも Mixamo にも入れていないので、ここで決めた形がそのまま出る
+      const thumbs = [];
+      obj.traverse((o) => { if (/RightHandThumb[123]$/.test(o.name)) thumbs.push({ b: o, rest: o.quaternion.clone() }); });
+      const bend = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.17, 0, 0));
+      d.userData.grip = (on) => { for (const t of thumbs) { t.b.quaternion.copy(t.rest); if (on) t.b.quaternion.multiply(bend); } };
+      return d;
+    }
+
+    // Blender で作った小物（2026-11-22）。読めたら ACCGLB に入り、accMesh はそちらを使う。at: 付ける骨
+    const ACCGLB = {}, ACC_AT = { shades: 'head', sleeve_black: 'larm', sleeve_black_up: 'uparm', wrist_pink: 'lhand', wrist_orange: 'lhand', wrist_orange_r: 'rhand', hairpin: 'top', hairtie_y: 'top' };
+    // ===== 選手の小物（偉人ごと）。大きさは m で作り、付ける骨の大きさに合わせて縮める =====
+    //   'top' = 頭のてっぺん（HeadTop_End）、'head' = 頭の付け根（Head）、'lhand' = 左の手首（LeftHand）。骨の向き: Y＝上、Z＝前
+    function accMesh(kind) {
+      if (ACCGLB[kind]) {   // Blender の形（骨から見た位置で作ってある。大きさは m）
+        const g = ACCGLB[kind].clone(true);
+        g.traverse((o) => { if (o.isMesh) { o.castShadow = true; const m0 = o.material;   // ゲームのほかの部品と同じ光の当たり方（Lambert）にそろえる。レンズだけ少しつやを残す
+          o.material = /lens/.test(m0.name) ? new THREE.MeshPhongMaterial({ color: m0.color, shininess: 80, specular: 0x666666 }) : new THREE.MeshLambertMaterial({ color: m0.color, side: m0.side }); } });
+        return { g, at: ACC_AT[kind] };
+      }
+      const g = new THREE.Group(), M = (c, side) => new THREE.MeshLambertMaterial({ color: c, side: side || THREE.FrontSide });
+      const add = (geo, mat, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); m.castShadow = true; g.add(m); return m; };
+      const ring = (r, tube, col, y) => add(new THREE.TorusGeometry(r, tube, 8, 28), M(col), 0, y, 0, Math.PI / 2);
+      let at = 'top';
+      switch (kind) {
+        case 'bicorne': { const m = add(new THREE.SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), M(0x151515), 0, -0.03); m.scale.set(0.22, 0.13, 0.08);
+          add(new THREE.CircleGeometry(0.018, 16), M(0xd4af37), 0.05, 0.02, 0.075); break; }   // 二角帽（横長）＋金の飾り
+        case 'beret': { const m = add(new THREE.SphereGeometry(1, 20, 10), M(0x3a2448), 0.01, -0.005, -0.01, 0, 0, 0.25); m.scale.set(0.115, 0.035, 0.115); break; }
+        case 'goldband': ring(0.09, 0.009, 0xd4af37, -0.065); break;
+        case 'whiteband': ring(0.09, 0.01, 0xf2f2f2, -0.065); break;
+        case 'laurel': { const m = ring(0.093, 0.012, 0x4f7a2a, -0.035); m.rotation.x = Math.PI / 2 + 0.15; break; }   // 月桂冠（前が少し下がる）
+        case 'furhat': add(new THREE.CylinderGeometry(0.1, 0.105, 0.11, 18), M(0x5a3e25), 0, 0.005); break;
+        case 'crown': add(new THREE.CylinderGeometry(0.07, 0.076, 0.065, 8, 1, true), M(0xd4af37, THREE.DoubleSide), 0, 0.015); break;
+        case 'mianguan': add(new THREE.CylinderGeometry(0.05, 0.055, 0.09, 12), M(0xc9a640), 0, 0.035);   // 冕冠（金の台の上に板。黒髪に埋もれないよう高めに）
+          add(new THREE.BoxGeometry(0.17, 0.014, 0.27), M(0x2a1a12), 0, 0.085);
+          for (const z of [-0.13, 0.13]) for (const x of [-0.06, -0.02, 0.02, 0.06]) add(new THREE.BoxGeometry(0.008, 0.07, 0.008), M(0xb02a2a), x, 0.045, z); break;   // 前後に垂れる玉飾り
+        case 'captain': add(new THREE.CylinderGeometry(0.098, 0.1, 0.055, 18), M(0x1e2a50), 0, -0.005);
+          add(new THREE.BoxGeometry(0.15, 0.008, 0.075), M(0x111111), 0, -0.03, 0.1); break;
+        case 'traveler': add(new THREE.CylinderGeometry(0.075, 0.088, 0.085, 16), M(0x7a5532), 0, 0.02);
+          add(new THREE.CylinderGeometry(0.17, 0.17, 0.006, 24), M(0x6a4528), 0, -0.02); break;
+        case 'glasses': at = 'head';
+          for (const sx of [-1, 1]) add(new THREE.TorusGeometry(0.021, 0.004, 6, 18), M(0x222222), sx * 0.033, 0.085, 0.092);
+          add(new THREE.BoxGeometry(0.024, 0.004, 0.004), M(0x222222), 0, 0.087, 0.094); break;
+        case 'wristband': at = 'lhand'; ring(0.036, 0.013, 0xc0c0c8, -0.005); break;
+        // ---- 主人公チームの小物（2026-11-20）----
+        case 'headband_red': case 'headband_white': {   // ヘッドバンド（おでこに巻く）
+          const col = kind === 'headband_red' ? 0xd8262c : 0xf4f4f4, th = kind === 'headband_red' ? 0.028 : 0.038;
+          const lowY = kind === 'headband_white' ? -0.078 : -0.07;
+          const m = add(new THREE.CylinderGeometry(0.122, 0.118, th, 32, 1, true), M(col, THREE.DoubleSide), 0, lowY, 0.006, 0.08); break; }
+        case 'wrist_orange': at = 'lhand'; ring(0.035, 0.012, 0xff8a1e, -0.02); break;
+        case 'wrist_orange_r': at = 'rhand'; ring(0.035, 0.012, 0xff8a1e, -0.02); break;
+        case 'wrist_pink': at = 'lhand'; ring(0.043, 0.017, 0xff6fa8, -0.02); break;
+        case 'sleeve_black': { at = 'larm'; add(new THREE.CylinderGeometry(0.036, 0.042, 0.2, 14, 1, true), M(0x16161a, THREE.DoubleSide), 0, 0.12, 0); break; }   // 前腕のアームスリーブ
+        case 'armband_captain': { at = 'uparm'; add(new THREE.CylinderGeometry(0.056, 0.056, 0.035, 16, 1, true), M(0xffd640, THREE.DoubleSide), 0, 0.15, 0); break; }   // キャプテンマーク（上腕）
+        case 'shades': { at = 'head';   // スポーツサングラス（目に）
+          const lens = add(new THREE.BoxGeometry(0.11, 0.024, 0.01), M(0x111418), 0, 0.083, 0.094); lens.scale.set(1, 1, 1);
+          for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.006, 0.008, 0.09), M(0x111418), sx * 0.058, 0.088, 0.05); break; }
+        case 'shades_head': {   // 頭に乗せたサングラス（白いふち・ピンクのレンズ）
+          add(new THREE.BoxGeometry(0.13, 0.032, 0.014), M(0xff7ab8), 0, -0.035, 0.1, -0.35);
+          add(new THREE.BoxGeometry(0.138, 0.008, 0.016), M(0xffffff), 0, -0.018, 0.106, -0.35); break; }
+        case 'towel': { at = 'neck';   // 首にかけたタオル（白）。前に両はしが垂れる
+          add(new THREE.TorusGeometry(0.09, 0.026, 8, 24), M(0xffffff), 0, 0.0, 0.0, Math.PI / 2 + 0.3);
+          for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.06, 0.26, 0.02), M(0xffffff), sx * 0.06, -0.13, 0.1, 0.12); break; }
+        case 'hairtie_y': {   // 桃瀬のポニーテールの根もとの黄色の髪ゴム（太めのゴム）。頭のてっぺんの骨が基準（2026-11-22）
+          const m = add(new THREE.TorusGeometry(0.034, 0.011, 10, 22), M(0xffd640), 0, -0.05, -0.088, 1.35, 0, 0); break; }
+        case 'hairpin': {   // 黄色のヘアピン（右のこめかみに2本）。頭のてっぺんの骨が基準
+          for (const dy of [0, 0.024]) add(new THREE.BoxGeometry(0.008, 0.012, 0.05), M(0xffd640), -0.1, -0.075 + dy, 0.045, -0.3); break; }
+        default: return null;
+      }
+      return { g, at };
+    }
+    // ===== 髪型（2026-11-20）。体ごとに実際の頭の形を測って、それに沿わせる =====
+    //   add: 頭の表面からの髪の厚さ [m] / front: 前の生えぎわ＝眉の上から [m]（マイナスで前髪が眉にかかる）/ side: 横の生えぎわ＝目の上から [m]
+    //   back: 後ろの生えぎわ＝目の上から [m] / bump: でこぼこ [m] / backZ: 後ろへ流す量 [m]
+    const HAIR = {
+      buzz: { add: 0.003, front: 0.022, side: 0.02, back: -0.05, bump: 0 },
+      short: { add: 0.012, front: 0.016, side: 0.012, back: -0.07, bump: 0.004 },
+      fringe: { add: 0.013, front: -0.004, side: 0.01, back: -0.07, bump: 0.003 },
+      slick: { add: 0.014, front: 0.022, side: 0.005, back: -0.1, bump: 0.002, backZ: 0.012 },
+      curly: { add: 0.026, front: 0.014, side: 0.005, back: -0.08, bump: 0.012 },
+      bob: { add: 0.016, front: 0.0, side: -0.075, back: -0.11, bump: 0.002 },
+      pony: { add: 0.01, front: 0.018, side: 0.01, back: -0.06, bump: 0.002, tail: 'pony' },
+      bun: { add: 0.01, front: 0.018, side: 0.01, back: -0.06, bump: 0.002, tail: 'bun' },
+      topknot: { add: 0.005, front: 0.024, side: 0.02, back: -0.05, bump: 0, tail: 'topknot' },
+      long: { add: 0.016, front: 0.004, side: -0.07, back: -0.12, bump: 0.002, tail: 'long' },
+    };
+    window.__HAIR = HAIR;   // 確かめる用
+    const HEADS = new Map();   // 体ごとの頭の形（頭の骨から見た位置。骨の単位）
+    function headShape(key, obj, head) {
+      if (HEADS.has(key)) return HEADS.get(key);
+      const t0 = performance.now();
+      obj.updateMatrixWorld(true);
+      const inv = head.matrixWorld.clone().invert(), p = new THREE.Vector3(), pts = [];
+      let browTop = -9, eyeTop = -9, zmin = 9, zmax = -9, faceTop = -9;
+      obj.traverse((m) => {
+        if (!m.isSkinnedMesh) return;
+        const nm = m.material.name, kind = /HairBack/.test(nm) ? 'hair' : /Face_00_SKIN/.test(nm) ? 'face' : /FaceBrow/.test(nm) ? 'brow' : /EyeWhite/.test(nm) ? 'eye' : null;
+        if (!kind) return;
+        const pos = m.geometry.attributes.position, used = new Set(m.geometry.index ? m.geometry.index.array : []);
+        for (const i of used) {
+          p.fromBufferAttribute(pos, i); m.applyBoneTransform(i, p); p.applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+          if (kind === 'brow') browTop = Math.max(browTop, p.y);
+          else if (kind === 'eye') eyeTop = Math.max(eyeTop, p.y);
+          else { pts.push(p.x, p.y, p.z); zmin = Math.min(zmin, p.z); zmax = Math.max(zmax, p.z); if (kind === 'face') faceTop = Math.max(faceTop, p.y); }
+        }
+      });
+      const c = new THREE.Vector3(0, eyeTop + (browTop - eyeTop) * 0.8, (zmin + zmax) / 2);   // 頭の中の基準点
+      // 球の向きごとに、頭の表面までの距離（その向きのまわり 12度の中で一番遠い点）
+      const sph = new THREE.SphereGeometry(1, 48, 32), sp = sph.attributes.position, R = new Float32Array(sp.count), d = new THREE.Vector3();
+      const n = pts.length / 3, dirs = new Float32Array(pts.length), len = new Float32Array(n);
+      for (let j = 0; j < n; j++) { d.set(pts[j * 3] - c.x, pts[j * 3 + 1] - c.y, pts[j * 3 + 2] - c.z); len[j] = d.length(); d.normalize(); dirs[j * 3] = d.x; dirs[j * 3 + 1] = d.y; dirs[j * 3 + 2] = d.z; }
+      let avg = 0; for (let j = 0; j < n; j++) avg += len[j]; avg /= Math.max(1, n);
+      for (let i = 0; i < sp.count; i++) {
+        const x = sp.getX(i), y = sp.getY(i), z = sp.getZ(i); let r = 0;
+        for (let j = 0; j < n; j++) if (dirs[j * 3] * x + dirs[j * 3 + 1] * y + dirs[j * 3 + 2] * z > 0.978) r = Math.max(r, len[j]);
+        R[i] = r || avg;
+      }
+      const ws = new THREE.Vector3(); head.getWorldScale(ws);
+      const shape = { c, R, sph, browTop, eyeTop, faceTop, u: 1 / ws.y };   // u: 1m を骨の単位にする倍率
+      HEADS.set(key, shape); (window.__headMs = window.__headMs || []).push(Math.round(performance.now() - t0));   // 測るのにかかった時間（確かめる用）
+      return shape;
+    }
+    // VRoid で作った髪型（髪だけ取り出したもの）。読み込めたら VHAIR に入る
+    const VHAIR = {}, VHAIR_FALLBACK = { v1: 'long', v2: 'bob', v3: 'short', v4: 'long', v5: 'long', v6: 'pony', m1: 'short', m2: 'fringe', m3: 'fringe', m5: 'fringe', c7: 'fringe', c11: 'short', c7v2: 'fringe', c7v3: 'fringe', c7v3t: 'fringe', c7v3p: 'fringe', c11v2: 'short', c11v3: 'short', c11v3s: 'short', c11v3r: 'short', c11v4: 'short', c11v4r: 'short', c11v4w: 'short', c11v5: 'short', c11v5r: 'short', c11v5u: 'short', c11v5p: 'short', c5: 'short', c21: 'fringe', c14: 'long', c3: 'pony', sC: 'short', sV: 'short', sX: 'short', sY: 'bob', sZ: 'fringe' };
+    (async () => {
+      const LIST = [['v1', 'vroid_hair1'], ['v2', 'vroid_hair2'], ['v3', 'vroid_hair3'], ['v4', 'vroid_hair4'], ['v5', 'vroid_hair5'], ['v6', 'vroid_hair6'], ['m1', 'vroid_hair_m1'], ['m2', 'vroid_hair_m2'], ['m3', 'vroid_hair_m3'], ['m5', 'vroid_hair_m5'], ['c7', 'vroid_hair_c7'], ['c11', 'vroid_hair_c11'], ['c7v2', 'vroid_hair_c7v2'], ['c7v3', 'vroid_hair_c7v3'], ['c7v3t', 'vroid_hair_c7v3t'], ['c7v3p', 'vroid_hair_c7v3p'], ['c11v2', 'vroid_hair_c11v2'], ['c11v3', 'vroid_hair_c11v3'], ['c11v3s', 'vroid_hair_c11v3s'], ['c11v3r', 'vroid_hair_c11v3r'], ['c11v4', 'vroid_hair_c11v4'], ['c11v4r', 'vroid_hair_c11v4r'], ['c11v4w', 'vroid_hair_c11v4w'], ['c11v5', 'vroid_hair_c11v5'], ['c11v5r', 'vroid_hair_c11v5r'], ['c11v5u', 'vroid_hair_c11v5u'], ['c11v5p', 'vroid_hair_c11v5p'], ['c5', 'vroid_hair_c5'], ['c21', 'vroid_hair_c21'], ['c14', 'vroid_hair_c14'], ['c3', 'vroid_hair_c3'], ['sC', 'vroid_hair_sC'], ['sV', 'vroid_hair_sV'], ['sX', 'vroid_hair_sX'], ['sY', 'vroid_hair_sY'], ['sZ', 'vroid_hair_sZ'],
+        ['fC', '../face/face_C'], ['fV', '../face/face_V'], ['fX', '../face/face_X'], ['fY', '../face/face_Y'], ['fZ', '../face/face_Z'], ['fc11', '../face/face_c11'], ['fc11v5', '../face/face_c11v5'], ['gV', '../face/glasses_V']];   // f＝顔・g＝メガネ（サンプルアバター）
+      const loads = LIST.map(([key, file]) => new Promise((res) => new GLTFLoader().load('assets/hair/' + file + '.glb', (g) => {
+        const parts = []; g.scene.traverse((o) => { if (o.isMesh) parts.push({ geo: o.geometry, map: o.material.map, name: o.material.name, mat: o.material, dict: o.morphTargetDictionary }); });   // 部品ごと（色の画像も部品ごと）
+        if (parts.length) VHAIR[key] = { parts, topY: (g.parser.json.extras || {}).headTopY || 0.2 };
+        res();
+      }, undefined, () => res())));
+      await Promise.all(loads);
+      if (Object.keys(VHAIR).length && R3D.rebuildAll) R3D.rebuildAll();   // 読めたら着替える
+    })();
+    (async () => {   // Blender の小物を読みこむ（wrist_orange_r は左と同じ形）
+      const FILES = { shades: 'shades', wrist_pink: 'wrist_pink', wrist_orange: 'wrist_orange', wrist_orange_r: 'wrist_orange', hairpin: 'hairpin', hairtie_y: 'hairtie_y' };
+      await Promise.all(Object.entries(FILES).map(([k, f]) => new Promise((res) => new GLTFLoader().load('assets/acc/' + f + '.glb', (g) => { ACCGLB[k] = g.scene; res(); }, undefined, () => res()))));
+      if (Object.keys(ACCGLB).length && R3D.rebuildAll) R3D.rebuildAll();   // 読めたら付け直す
+    })();
+    // サンプルアバターの顔・メガネを頭の骨に付ける（2026-11-20）。faceMats: 元の顔の材質（名前 → 材質）。見た目をそろえるため、同じ名前の材質を写して使う
+    // ===== 選手ごとの「ふだんの顔」と「体型」（2026-11-22）=====
+    function setExpr(m, expr) {   // 表情の部品を少しだけかける（名前は Fcl_ を省いたもの）
+      if (!m.morphTargetDictionary || !m.morphTargetInfluences) return;
+      for (const k in expr) { const i = m.morphTargetDictionary['Fcl_' + k]; if (i !== undefined) m.morphTargetInfluences[i] = expr[k]; }
+    }
+    function shapeBody(obj, b) {   // 骨の太さと鎖骨の長さを変える。背中の丸みは [{ b: 骨, q: 回転 }] を返して、毎フレーム動きのあとに足す
+      if (!b) return null;
+      const bone = (re) => { let r = null; obj.traverse((o) => { if (!r && o.isBone && re.test(o.name)) r = o; }); return r; };
+      const fat = (from, back, s, axes) => {   // from の骨から太くして、back の骨で元に戻す（axes: 太くする向き）
+        if (!s || s === 1) return;
+        for (const side of ['Left', 'Right', '']) {
+          const f = bone(new RegExp(side + from + '$')), k = bone(new RegExp(side + back + '$'));
+          if (!f || !k || (side === '' && /Left|Right/.test(f.name))) continue;
+          for (const ax of axes) { f.scale[ax] *= s; k.scale[ax] /= s; }
+          if (!side) break;
+        }
+      };
+      fat('Arm', 'Hand', b.arm, ['x', 'z']);          // 二の腕から前腕まで（手は元の大きさ）
+      fat('UpLeg', 'Foot', b.leg, ['x', 'z']);        // 太ももからすねまで（足は元の大きさ）
+      fat('Neck', 'Head', b.neck, ['x', 'z']);        // 首（頭は元の大きさ）
+      if (b.chest && b.chest !== 1) {                 // 胸の厚み（前うしろ）。首と肩から先は元に戻す
+        const c = bone(/Spine2$/);
+        if (c) { c.scale.z *= b.chest; for (const ch of c.children) if (ch.isBone) ch.scale.z /= b.chest; }
+      }
+      if (b.sh && b.sh !== 1) for (const side of ['Left', 'Right']) { const a = bone(new RegExp(side + 'Arm$')); if (a) a.position.multiplyScalar(b.sh); }   // 鎖骨の長さ＝肩幅
+      const post = [];
+      if (b.bend) {                                   // 背中の丸み（＋猫背・−背すじ）。胸と首で半分ずつ
+        for (const n of ['Spine2', 'Neck']) { const x = bone(new RegExp(n + '$')); if (x) post.push({ b: x, q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), b.bend / 2) }); }
+      }
+      return post.length ? post : null;
+    }
+    function vroidFace(key, head, obj, H, lk, faceMats) {
+      const V = VHAIR[key]; if (!V) return null;
+      let sk = null; obj.traverse((o) => { if (!sk && o.isSkinnedMesh && o.skeleton.bones.includes(head)) sk = o; });
+      const T = new THREE.Matrix4();
+      if (sk) { T.copy(sk.skeleton.boneInverses[sk.skeleton.bones.indexOf(head)]).multiply(sk.bindMatrix); T.setPosition(0, 0, 0); }
+      const k = H && H.faceTop > 0 ? H.faceTop / V.topY : 1;
+      const g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrix.copy(T).multiply(new THREE.Matrix4().makeScale(k, k, k));
+      const LC = window.LOOK_COLOR;
+      for (const pt of V.parts) {
+        const nk = (pt.name || '').replace(/ \(Instance\)/, '').replace(/_\d\d$/, '');
+        const base = Object.keys(faceMats).find((n) => n === nk) ? faceMats[nk] : null;
+        const mat = base ? base.clone() : pt.mat.clone();
+        let map = pt.map;
+        if (map && /Face_00_SKIN/.test(nk) && LC.skin[lk.skin]) map = recolor(map, LC.skin[lk.skin], 0.93 * 255);   // 肌の色
+        if (map && /EyeIris/.test(nk) && LC.eye && LC.eye[lk.eye]) map = vividIris(map, LC.eye[lk.eye]);   // 黒目の色（鮮やかに）
+        mat.map = map; mat.visible = true; mat.needsUpdate = true;
+        const m = new THREE.Mesh(pt.geo, mat); m.frustumCulled = false; m.renderOrder = base ? 0 : 1; g.add(m);
+        if (pt.dict && lk.expr) { m.morphTargetDictionary = pt.dict; setExpr(m, lk.expr); }   // ふだんの顔（2026-11-22）
+      }
+      return g;
+    }
+    function vroidHair(style, rgb, head, top, obj, H, tip) {   // tip: 毛先に混ぜる色（パーソナルカラー。2026-11-20）
+      const V = VHAIR[style]; if (!V) return null;
+      // 元の体の向き → 今の頭の骨の向き（骨の付け替えの分）
+      let sk = null; obj.traverse((o) => { if (!sk && o.isSkinnedMesh && o.skeleton.bones.includes(head)) sk = o; });
+      const T = new THREE.Matrix4();
+      if (sk) { T.copy(sk.skeleton.boneInverses[sk.skeleton.bones.indexOf(head)]).multiply(sk.bindMatrix); T.setPosition(0, 0, 0); }
+      const k = H && H.faceTop > 0 ? H.faceTop / V.topY : 1;   // 頭の大きさの比（どちらも「顔の肌の一番高い所」で測る）
+      const g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrix.copy(T).multiply(new THREE.Matrix4().makeScale(k, k, k));
+      for (const pt of V.parts) {
+        const map = pt.map ? (tip ? vividHair(pt.map, rgb, tip) : recolor(pt.map, rgb, 0.62 * 255)) : null;   // 選手の髪の色に塗り直す（主人公チームは鮮やかに）
+        const m = new THREE.Mesh(pt.geo, new THREE.MeshBasicMaterial({ map, color: map ? 0xffffff : new THREE.Color(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255), alphaTest: 0.5, side: THREE.DoubleSide }));
+        m.castShadow = true; m.frustumCulled = false; g.add(m);
+      }
+      return g;
+    }
+    function hairMesh(style, rgb, H) {
+      const o = HAIR[style]; if (!o) return null;
+      const u = H.u, g = new THREE.Group(), col = new THREE.Color(rgb[0] / 255 * 0.92, rgb[1] / 255 * 0.92, rgb[2] / 255 * 0.92);
+      const mat = new THREE.MeshLambertMaterial({ color: col });
+      const geo = H.sph.clone(), pos = geo.attributes.position, c = H.c;
+      const lf = H.browTop + o.front * u, ls = H.eyeTop + o.side * u, lb = H.eyeTop + o.back * u;   // 生えぎわ（前・横・後ろ）の高さ
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), r = H.R[i];
+        const f = Math.max(0, z), b = Math.max(0, -z), line = ls + (lf - ls) * f + (lb - ls) * b;
+        const py = c.y + y * r;   // 頭の表面の高さ
+        const bump = o.bump * Math.sin(x * 17 + y * 9) * Math.sin(z * 13 + y * 7);
+        let rr;
+        if (py < line) rr = r * 0.5;   // 生えぎわより下: 頭の中へ深くしまう（浅いと鼻や口のまわりにはみ出る）
+        else { const t = Math.min(1, (py - line) / (0.02 * u)); rr = r + (o.add + bump) * u * (0.25 + 0.75 * t); }   // 生えぎわは薄く
+        const bz = o.backZ && z < 0 ? -o.backZ * u * -z : 0;
+        pos.setXYZ(i, c.x + x * rr, c.y + y * rr, c.z + z * rr + bz);
+      }
+      geo.computeVertexNormals();
+      const cap = new THREE.Mesh(geo, mat); cap.castShadow = true; g.add(cap);
+      const surf = (dx, dy, dz, extra) => {   // その向きの、頭の表面＋extra [m] の点
+        const v = new THREE.Vector3(dx, dy, dz).normalize(); let best = 0, bi = 0;
+        for (let i = 0; i < H.R.length; i++) { const dd = H.sph.attributes.position.getX(i) * v.x + H.sph.attributes.position.getY(i) * v.y + H.sph.attributes.position.getZ(i) * v.z; if (dd > best) { best = dd; bi = i; } }
+        return v.multiplyScalar(H.R[bi] + extra * u).add(c);
+      };
+      const add = (gm, at, rx) => { const m = new THREE.Mesh(gm, mat); m.position.copy(at); m.rotation.x = rx || 0; m.scale.setScalar(u); m.castShadow = true; g.add(m); return m; };
+      if (o.tail === 'pony') { add(new THREE.SphereGeometry(0.028, 14, 10), surf(0, 0.25, -1, o.add)); const t = surf(0, 0.0, -1, o.add + 0.03); t.y -= 0.05 * u; add(new THREE.CylinderGeometry(0.026, 0.008, 0.22, 12), t, 0.3); }
+      if (o.tail === 'bun') add(new THREE.SphereGeometry(0.046, 16, 12), surf(0, 0.55, -0.85, o.add + 0.025));
+      if (o.tail === 'topknot') { const t = surf(0, 1, -0.25, o.add + 0.02); add(new THREE.CylinderGeometry(0.018, 0.024, 0.06, 12), t, -0.5); add(new THREE.SphereGeometry(0.022, 12, 8), t.clone().add(new THREE.Vector3(0, 0.03 * u, -0.015 * u))); }
+      if (o.tail === 'long') {   // 後ろに垂れる髪（後ろ半分の筒）
+        const back = surf(0, -0.2, -1, 0), rad = Math.abs(back.z - c.z) + (o.add + 0.002) * u;
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * 1.2, 0.22 * u, 24, 1, true, Math.PI / 2, Math.PI), new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide }));
+        m.position.set(c.x, H.eyeTop - 0.1 * u, c.z); m.castShadow = true; g.add(m);
+      }
+      return g;
+    }
+    // ===== 手袋（2026-11-20）: 本物のアルティメット用グローブの形（黒の本体＋手のひら側の滑り止め＋手首のベルトにチームの色）=====
+    //   肌の画像のうち、手と指の骨で動く所を塗る。手のひら側か甲側かは、立ちポーズでの点の向き（手のひらは下向き）で決める
+    const HAND_TRIS = new Map(), GLOVE_CACHE = new Map();
+    function handTris(mesh) {   // 手袋の所の三角形（画像の上の位置）と種類（1＝本体／2＝滑り止め／3＝手首のベルト）。体ごとに1回
+      const g = mesh.geometry; if (HAND_TRIS.has(g)) return HAND_TRIS.get(g);
+      const si = g.attributes.skinIndex, sw = g.attributes.skinWeight, uv = g.attributes.uv, nr = g.attributes.normal, idx = g.index, bones = mesh.skeleton.bones;
+      const kind = new Uint8Array(si.count);
+      for (let i = 0; i < si.count; i++) {
+        let best = 0, bw = -1, fore = 0, hw = 0;
+        for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k), nm = (bones[si.getComponent(i, k)] || {}).name || ''; if (w > bw) { bw = w; best = si.getComponent(i, k); } if (/ForeArm/.test(nm)) fore += w; if (/Hand/.test(nm)) hw += w; }
+        const nm = (bones[best] && bones[best].name) || '';
+        const ny = nr ? nr.getY(i) : 0;                       // 下向き＝手のひら側
+        if (!/Hand/.test(nm)) { if (hw >= 0.2) kind[i] = ny > -0.2 ? 3 : 1; continue; }   // 手首のカフ（前腕寄りでも手の重みがある所）: 甲側はベルト
+        if (fore > 0.12) kind[i] = ny > -0.2 ? 3 : 1;         // 手首: 甲側はベルト（チームの色）、手のひら側は本体
+        else if (ny < -0.35 && (/(Index|Middle|Ring|Pinky)3$/.test(nm) || /Thumb3$/.test(nm) || /Hand$/.test(nm))) kind[i] = 2;   // 指先・手のひらの滑り止め
+        else kind[i] = 1;
+      }
+      const tris = [];
+      if (idx && uv) for (let t = 0; t < idx.count; t += 3) {
+        const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+        if (!(kind[a] && kind[b] && kind[c])) continue;
+        const k = kind[a] === kind[b] && kind[b] === kind[c] ? kind[a] : 1;   // 3つの点が同じ種類のときだけ、その色（境目をなめらかに）
+        tris.push(uv.getX(a), uv.getY(a), uv.getX(b), uv.getY(b), uv.getX(c), uv.getY(c), k);
+      }
+      HAND_TRIS.set(g, tris); return tris;
+    }
+    function gloveMap(mesh, map, rgb, key, belt, body) {   // belt: 手首のベルトの色 / body: 本体の色（2026-11-20。ユニフォームの濃い色）
+      belt = belt || rgb;
+      const ck = key + '|' + rgb.join() + '|' + belt.join() + '|' + (body ? body.join() : ''); if (GLOVE_CACHE.has(ck)) return GLOVE_CACHE.get(ck);
+      const tris = handTris(mesh), img = map.image; if (!tris.length || !img) return map;
+      const dark = rgb[0] + rgb[1] + rgb[2] < 200;
+      let base = dark ? [232, 232, 236] : [26, 26, 30], grip = dark ? [196, 198, 204] : [70, 72, 78];   // 本体（黒。チームの色が黒なら白）と滑り止め
+      if (body) { base = body; grip = body.map((v) => Math.min(255, Math.round(v * 1.5 + 30))); }   // ユニフォームの色の本体＋少し明るい滑り止め
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const W = c.width, H = c.height, flip = map.flipY, col = (c3) => `rgb(${c3[0]},${c3[1]},${c3[2]})`;
+      g.lineWidth = 5; g.lineJoin = 'round';
+      for (const pass of [1, 2, 3]) {   // 本体 → 滑り止め → ベルト の順に重ねる
+        g.fillStyle = g.strokeStyle = col(pass === 1 ? base : pass === 2 ? grip : belt);
+        for (let i = 0; i < tris.length; i += 7) {
+          if (tris[i + 6] !== pass) continue;
+          g.beginPath();
+          for (let k = 0; k < 3; k++) { const x = tris[i + k * 2] * W, y = (flip ? 1 - tris[i + k * 2 + 1] : tris[i + k * 2 + 1]) * H; if (k) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.closePath(); g.fill(); if (pass !== 3) g.stroke();   // 本体と滑り止めは少し太らせて、つなぎ目の隙間をふさぐ
+        }
+      }
+      const t = map.clone(); t.source = new map.source.constructor(c); t.needsUpdate = true;   // 別の画像として持つ（clone のままだと共有される）
+      GLOVE_CACHE.set(ck, t); return t;
+    }
+    // ===== 左腕のアームスリーブ（2026-11-22 白銀）: 左の二の腕・前腕の骨で動く肌の絵をぬる。実物どおり「2枚目の肌」（腕にぴったり・ひじでなめらかに曲がる）=====
+    //   色: 本体（少し明るい黒）・手首のふち（濃い黒）・二の腕のすべり止めの帯（灰色）・腕のうしろの縫い目（灰色の細い線）
+    //   s: 腕のどこか（0＝肩 1＝ひじ 2＝手首）。立ちポーズの骨の位置（boneInverses から戻す）に点を投げて測る
+    const SLEEVE = { base: [38, 38, 44], hem: [16, 16, 18], grip: [92, 94, 102], seam: [58, 58, 66], gripS: [0.74, 0.8], hemS: 1.86, seamDot: 0.985 };
+    const ARM_TRIS = new Map(), SLEEVE_CACHE = new Map();
+    function armTris(mesh) {
+      const g = mesh.geometry; if (ARM_TRIS.has(g)) return ARM_TRIS.get(g);
+      const si = g.attributes.skinIndex, sw = g.attributes.skinWeight, uv = g.attributes.uv, idx = g.index, pos = g.attributes.position, bones = mesh.skeleton.bones;
+      const bp = (re) => { const i = bones.findIndex((b) => re.test(b.name)); if (i < 0) return null; const m = new THREE.Matrix4().copy(mesh.skeleton.boneInverses[i]).invert(); return new THREE.Vector3().setFromMatrixPosition(m); };
+      const S = bp(/LeftArm$/), E = bp(/LeftForeArm$/), W = bp(/LeftHand$/);
+      const cls = new Uint8Array(si.count), v = new THREE.Vector3(), seg = new THREE.Vector3(), q = new THREE.Vector3();
+      const where = (a, b) => { seg.subVectors(b, a); const L2 = seg.lengthSq(); const u = Math.max(0, Math.min(1, q.subVectors(v, a).dot(seg) / L2)); return { u, rad: q.subVectors(v, a).addScaledVector(seg, -u).normalize() }; };
+      for (let i = 0; i < si.count; i++) {
+        let arm = 0, hand = 0;
+        for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k), nm = (bones[si.getComponent(i, k)] || {}).name || ''; if (/LeftArm$|LeftForeArm/.test(nm)) arm += w; if (/LeftHand/.test(nm)) hand += w; }
+        if (!(arm >= 0.5 && hand < 0.2)) continue;
+        cls[i] = 1;
+        if (!S || !E || !W) continue;
+        v.fromBufferAttribute(pos, i);
+        const up = where(S, E), lo = where(E, W);
+        const onLo = lo.u > 0 && (up.u >= 1 || v.distanceToSquared(E) < 1e9 && lo.u > 0.02);
+        const s = onLo ? 1 + lo.u : up.u, rad = onLo ? lo.rad : up.rad;
+        if (s >= SLEEVE.hemS) cls[i] = 2;                                    // 手首のふち
+        else if (s >= SLEEVE.gripS[0] && s <= SLEEVE.gripS[1]) cls[i] = 3;   // 二の腕のすべり止めの帯
+        else if (-rad.z > SLEEVE.seamDot) cls[i] = 4;                         // 腕のうしろ（立ちポーズで体の後ろ向き）の縫い目
+      }
+      const tris = [];
+      if (idx && uv) for (let t = 0; t < idx.count; t += 3) {
+        const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+        if (!(cls[a] && cls[b] && cls[c])) continue;
+        const k = cls[a] === cls[b] && cls[b] === cls[c] ? cls[a] : (cls[a] === 2 || cls[b] === 2 || cls[c] === 2) && cls[a] !== 1 && cls[b] !== 1 && cls[c] !== 1 ? 2 : 1;
+        tris.push(uv.getX(a), uv.getY(a), uv.getX(b), uv.getY(b), uv.getX(c), uv.getY(c), k);
+      }
+      ARM_TRIS.set(g, tris); return tris;
+    }
+    function sleeveMap(mesh, map, key) {
+      const ck = key + '|' + map.uuid; if (SLEEVE_CACHE.has(ck)) return SLEEVE_CACHE.get(ck);
+      const tris = armTris(mesh), img = map.image; if (!tris.length || !img) return map;
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const W = c.width, H = c.height, flip = map.flipY, col = (c3) => `rgb(${c3[0]},${c3[1]},${c3[2]})`;
+      g.lineJoin = 'round';
+      for (const pass of [1, 4, 3, 2]) {   // 本体 → 縫い目 → すべり止め → 手首のふち の順に重ねる
+        const cc = col(pass === 1 ? SLEEVE.base : pass === 2 ? SLEEVE.hem : pass === 3 ? SLEEVE.grip : SLEEVE.seam);
+        g.fillStyle = g.strokeStyle = cc; g.lineWidth = pass === 1 ? 4 : 1.5;
+        for (let i = 0; i < tris.length; i += 7) {
+          if (tris[i + 6] !== pass) continue;
+          g.beginPath();
+          for (let k = 0; k < 3; k++) { const x = tris[i + k * 2] * W, y = (flip ? 1 - tris[i + k * 2 + 1] : tris[i + k * 2 + 1]) * H; if (k) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.closePath(); g.fill(); g.stroke();
+        }
+      }
+      const t = map.clone(); t.source = new map.source.constructor(c); t.needsUpdate = true;
+      SLEEVE_CACHE.set(ck, t); return t;
+    }
+    // ===== 毛束の髪（2026-11-20）。VRoid と同じ考え方: 頭の表面から毛束を流れに沿って伸ばす =====
+    const STRAND_TEX = new Map();
+    function strandTex(rgb) {   // 毛束に貼る髪の画像（縦＝根元→毛先）: 根元が暗い・光の輪・細い筋
+      const k = rgb.join(); if (STRAND_TEX.has(k)) return STRAND_TEX.get(k);
+      const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d');
+      const col = (f, add = 0) => `rgb(${Math.min(255, rgb[0] * f + add) | 0},${Math.min(255, rgb[1] * f + add) | 0},${Math.min(255, rgb[2] * f + add) | 0})`;
+      const gr = g.createLinearGradient(0, 0, 0, 256);
+      gr.addColorStop(0, col(0.55)); gr.addColorStop(0.18, col(0.85)); gr.addColorStop(0.3, col(1.0, 70)); gr.addColorStop(0.36, col(1.0, 25));
+      gr.addColorStop(0.42, col(0.95)); gr.addColorStop(0.85, col(1.0)); gr.addColorStop(1, col(1.08, 12));
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 256);
+      g.globalAlpha = 0.18; g.fillStyle = col(0.45);
+      for (const x of [9, 20, 31, 41, 53]) g.fillRect(x, 0, 2, 256);   // 毛の筋
+      const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.flipY = false;
+      STRAND_TEX.set(k, tx); return tx;
+    }
+    // 頭の表面までの距離（向きから）
+    function headR(H, v) { const sp = H.sph.attributes.position; let best = -2, bi = 0; for (let i = 0; i < sp.count; i++) { const d = sp.getX(i) * v.x + sp.getY(i) * v.y + sp.getZ(i) * v.z; if (d > best) { best = d; bi = i; } } return H.R[bi]; }
+    // 毛束1本: root（向き）, dir（伸びる向き）, len [m], w 根元の幅 [m], o: grav 重力 / back 後ろへ / flick 毛先のはね / curl うねり / out 外向き
+    function strandGeo(H, rootDir, o, P) {
+      const u = H.u, c = H.c, N = 10;
+      const v0 = rootDir.clone().normalize(), r0 = headR(H, v0);
+      let p = c.clone().add(v0.clone().multiplyScalar(r0 + 0.002 * u));
+      let d = (o.dir ? o.dir.clone() : v0.clone()).normalize();
+      const pts = [p.clone()], step = o.len * u / (N - 1);
+      for (let i = 1; i < N; i++) {
+        const tt = i / (N - 1);
+        const out = p.clone().sub(c).normalize();
+        d.add(out.multiplyScalar((o.out || 0) * (1 - tt)));
+        d.y -= (o.grav || 0) * tt; d.z -= (o.back || 0); if (o.flick && tt > 0.65) d.y += o.flick;
+        if (o.curl) { const s = Math.sin(tt * Math.PI * 2 * (o.curlN || 1) + (o.phase || 0)) * o.curl; d.x += s; }
+        d.normalize();
+        p = p.clone().add(d.clone().multiplyScalar(step));
+        const q = p.clone().sub(c), ql = q.length(), rr = headR(H, q.clone().normalize()) + (0.004 + 0.012 * Math.min(1, tt * 3)) * u;   // 頭にめり込まない
+        if (ql < rr) p = c.clone().add(q.multiplyScalar(rr / ql));
+        pts.push(p.clone());
+      }
+      for (let i = 0; i < N; i++) {   // ひし形の断面で輪を作る
+        const pt = pts[i], tan = pts[Math.min(N - 1, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize();
+        let nr = pt.clone().sub(c).normalize(); nr.sub(tan.clone().multiplyScalar(nr.dot(tan))).normalize();
+        const sd = new THREE.Vector3().crossVectors(tan, nr).normalize();
+        const tt = i / (N - 1), w = o.w * u * (Math.pow(1 - tt, o.taper || 0.8) * 0.94 + 0.06), th = w * 0.38;
+        const ring = [pt.clone().add(sd.clone().multiplyScalar(w)), pt.clone().add(nr.clone().multiplyScalar(th)), pt.clone().sub(sd.clone().multiplyScalar(w)), pt.clone().sub(nr.clone().multiplyScalar(th * 0.7))];
+        const shade = [0.92, 1.0, 0.92, 0.62];
+        ring.forEach((q, k) => { P.pos.push(q.x, q.y, q.z); P.uv.push([0, 0.5, 1, 0.5][k], tt); P.col.push(shade[k], shade[k], shade[k]); });
+      }
+      const b0 = P.n; P.n += N * 4;
+      for (let i = 0; i < N - 1; i++) for (let k = 0; k < 4; k++) { const a = b0 + i * 4 + k, b = b0 + i * 4 + (k + 1) % 4, a2 = a + 4, b2 = b + 4; P.idx.push(a, a2, b, b, a2, b2); }
+    }
+    const fib = (n) => { const out = []; for (let i = 0; i < n; i++) { const y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963; out.push(new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r)); } return out; };
+    let seedS = 1; const rnd = () => { seedS = (seedS * 16807) % 2147483647; return seedS / 2147483647; };
+    // 髪型ごとの毛束の並べ方
+    const STRAND_STYLES = {
+      s_messy: { base: 'short', groups: [   // 一ノ瀬: くせ毛。太い毛束が後ろへ流れ、毛先があちこちにはねる
+        { n: 70, keep: (v) => v.y > 0.0 && !(v.z > 0.5 && v.y < 0.6), o: () => ({ len: 0.085 + rnd() * 0.035, w: 0.03, out: 0.25, grav: 0.32, back: 0.16, flick: 0.32, curl: 0.22, phase: rnd() * 6, taper: 1.1 }) },
+        { n: 150, keep: (v) => v.z > 0.45 && v.y > 0.3 && v.y < 0.78, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.7, -0.6, 0.75), len: 0.055 + rnd() * 0.015, w: 0.024, out: 0.1, grav: 0.5, flick: 0.18, curl: 0.15, phase: rnd() * 6, taper: 1.3 }) },   // 前髪（太めの毛束が目の上でとがる）
+      ] },
+      s_spiky: { base: 'short', groups: [   // 白銀: ツンツン。太い毛束が上と後ろへ鋭く立つ
+        { n: 60, keep: (v) => v.y > 0.15 && !(v.z > 0.55 && v.y < 0.55), o: (v) => ({ dir: new THREE.Vector3(v.x * 0.7, 0.55 + v.y * 0.3, v.z * 0.3 - 0.75), len: 0.085 + rnd() * 0.045, w: 0.032, out: 0.45, grav: 0.04, back: 0.05, taper: 1.7 }) },
+        { n: 40, keep: (v) => v.y > -0.25 && v.y < 0.25 && v.z < 0.3, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.8, 0.1, -0.6), len: 0.07 + rnd() * 0.03, w: 0.03, out: 0.4, grav: 0.1, taper: 1.7 }) },   // 横と後ろ
+        { n: 150, keep: (v) => v.z > 0.5 && v.y > 0.32 && v.y < 0.75, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.9, -0.3, 0.9), len: 0.06 + rnd() * 0.02, w: 0.022, out: 0.25, grav: 0.3, taper: 1.7 }) },   // 前髪（短くとがる）
+      ] },
+      s_pony: { base: 'slick', groups: [   // 春野: 後ろで1つに結んだポニーテール
+        { n: 160, keep: (v) => v.z > 0.5 && v.y > 0.25 && v.y < 0.75, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.5 + 0.3, -0.6, 0.8), len: 0.07 + rnd() * 0.02, w: 0.022, out: 0.1, grav: 0.6, taper: 1.0 }) },   // 前髪（少し横に流す）
+        { n: 60, keep: (v) => Math.abs(v.x) > 0.75 && v.y > -0.2 && v.y < 0.4 && v.z > -0.1, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.3, -1, 0.15), len: 0.12, w: 0.02, out: 0.05, grav: 0.8, taper: 0.9 }) },   // 横の垂れ毛
+      ], tail: 'pony' },
+      s_braid: { base: 'slick', groups: [   // 桃瀬: 三つ編み
+        { n: 160, keep: (v) => v.z > 0.5 && v.y > 0.25 && v.y < 0.75, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.7, -0.6, 0.8), len: 0.075 + rnd() * 0.02, w: 0.022, out: 0.1, grav: 0.6, curl: 0.06, phase: rnd() * 6, taper: 1.0 }) },
+        { n: 60, keep: (v) => Math.abs(v.x) > 0.75 && v.y > -0.2 && v.y < 0.4 && v.z > -0.1, o: (v) => ({ dir: new THREE.Vector3(v.x * 0.3, -1, 0.15), len: 0.13, w: 0.02, out: 0.05, grav: 0.8, curl: 0.05, taper: 0.9 }) },
+      ], tail: 'braid' },
+    };
+    function strandHair(style, rgb, H) {
+      const S = STRAND_STYLES[style]; if (!S) return null;
+      seedS = 7 + style.length * 131;   // 毎回同じ形になるように
+      const g = new THREE.Group(), u = H.u, c = H.c;
+      const base = hairMesh(S.base, rgb.map((x) => x * 0.8), H); if (base) g.add(base);   // 土台（すき間から頭皮が見えないように）
+      const P = { pos: [], uv: [], col: [], idx: [], n: 0 };
+      for (const gp of S.groups) for (const v of fib(gp.n)) { if (!gp.keep(v)) continue; strandGeo(H, v, gp.o(v), P); }
+      // 結んだ髪（ポニーテール・三つ編み）: 後ろの結び目から下へ
+      if (S.tail) {
+        const tdir = new THREE.Vector3(0, 0.15, -1).normalize(), tie = c.clone().add(tdir.clone().multiplyScalar(headR(H, tdir) + 0.012 * u));   // 結び目: 後頭部の真ん中の高さ
+        if (S.tail === 'pony') {
+          for (let i = 0; i < 26; i++) {
+            const a = (i / 26) * Math.PI * 2, off = new THREE.Vector3(Math.cos(a) * 0.012 * u, Math.sin(a) * 0.008 * u, 0);
+            const rootV = tie.clone().add(off).sub(c).normalize();
+            strandGeo(H, rootV, { dir: new THREE.Vector3(Math.cos(a) * 0.15, -0.35, -0.6), len: 0.24 + rnd() * 0.05, w: 0.018, out: 0, grav: 1.1, back: 0, curl: 0.04, phase: a, taper: 0.7 }, P);
+          }
+        }
+        if (S.tail === 'braid') {   // 三つ編み: 左右に交互にずれた粒を、首の後ろから肩へ
+          const mat = new THREE.MeshBasicMaterial({ map: strandTex(rgb), vertexColors: false });
+          for (let i = 0; i < 9; i++) {
+            const tt = i / 8, side = i % 2 ? 1 : -1;
+            const seg = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mat);
+            seg.scale.set(0.026 * u * (1 - tt * 0.35), 0.03 * u, 0.02 * u);
+            seg.position.copy(tie).add(new THREE.Vector3(side * 0.008 * u, -0.035 * u * i - 0.01 * u, -0.01 * u - 0.022 * u * Math.min(i, 4)));
+            seg.rotation.z = side * 0.5; seg.castShadow = true; g.add(seg);
+          }
+          const end = new THREE.Mesh(new THREE.ConeGeometry(0.014 * u, 0.05 * u, 10), mat); end.position.copy(tie).add(new THREE.Vector3(0, -0.035 * u * 9 - 0.02 * u, -0.098 * u)); end.rotation.x = Math.PI; g.add(end);
+        }
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.014 * u, 0.005 * u, 8, 16), new THREE.MeshBasicMaterial({ color: 0xffd640 })); band.position.copy(tie); g.add(band);   // 髪ゴム
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(P.pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(P.uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(P.col, 3));
+      geo.setIndex(P.idx);
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: strandTex(rgb), vertexColors: true, side: THREE.DoubleSide }));
+      m.castShadow = true; m.frustumCulled = false; g.add(m);
+      return g;
+    }
+    function makePlayer(pl) {
+      const B = bodyOf(pl), SCALE = B.SCALE, clips = B.clips;   // この選手の体
+      const obj = SkeletonUtils.clone(B.scene);
+      obj.scale.setScalar(SCALE);
+      const mats = [], faceMats = {};
+      obj.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true; o.frustumCulled = false;
+        o.material = o.material.clone();   // 近いときだけ半透明にするため、1人ずつ別の材質にする
+        const wear = TEAM_WEAR[pl.team];
+        // ユニフォーム（2026-11-20）: 選手ごとに 柄・番号・名前 を描いたシャツと、ゲームパンツ。用意ができていなければ、前のように色を塗るだけ
+        const kit = window.UFPS_KIT && window.Uniform && Uniform.isReady() ? window.UFPS_KIT[pl.team] : null;
+        if (kit && /Top|Bottom/i.test(o.material.name) && o.material.map) {
+          const src = o.material.map, t = src.clone();
+          const cv = /Top/i.test(o.material.name) ? Uniform.jersey(src.image, kit, pl.n, (pl.r && pl.r.en) || '', pl.r && pl.r.look && pl.r.look.pc) : Uniform.pants(src.image, kit, pl.n, pl.r && pl.r.look && pl.r.look.pc);
+          t.source = new src.source.constructor(cv);   // 選手ごとに別の画像（clone のままだと全員で1枚を共有する）
+          t.needsUpdate = true; o.material.map = t;
+        } else {
+          if (/Top/i.test(o.material.name) && o.material.map) o.material.map = recolor(o.material.map, wear.top, 0.85 * 255, 0.6);
+          if (/Bottom/i.test(o.material.name) && o.material.map) o.material.map = recolor(o.material.map, wear.bottom, 0.8 * 255, 0.6);
+        }
+        // 選手ごとの色（髪・肌・靴）
+        var lk = pl.r && pl.r.look, LC = window.LOOK_COLOR;
+        if (lk && lk.expr && o.morphTargetDictionary) setExpr(o, lk.expr);   // ふだんの顔（2026-11-22）
+        if (lk && LC && o.material.map) {
+          if (/Hair/i.test(o.material.name) && LC.hair[lk.hair]) o.material.map = recolor(o.material.map, LC.hair[lk.hair], 0.62 * 255);
+          if (/Body|Face_00_SKIN/i.test(o.material.name) && LC.skin[lk.skin]) o.material.map = recolor(o.material.map, LC.skin[lk.skin], 0.93 * 255);   // 顔の肌も
+          if (/Shoe/i.test(o.material.name) && (kit || LC.shoes[lk.shoes])) { const dp = kit && kit.pal.deep, sc = kit ? (dp || kit.pal.main) : LC.shoes[lk.shoes]; const lt = sc[0] + sc[1] + sc[2] > 600;
+            o.material.map = dp ? shoeMap(o.material.map, dp, kit.pal.ivory || [245, 245, 245], kit.pal.gold || kit.pal.accent)   // 紺＋白＋金（差し色）
+              : recolor(o.material.map, sc, (lt ? 0.95 : 0.8) * 255, lt ? 0.86 : 0); }   // 靴: ユニフォームの地の色（2026-11-20）
+          if (kit && /Body_00_SKIN/i.test(o.material.name) && o.isSkinnedMesh) o.material.map = gloveMap(o, o.material.map, kit.pal.main, ((pl.r && pl.r.body) || 'm') + '|' + lk.skin, kit.pal.gold || kit.pal.accent, kit.pal.deep || kit.pal.pants);   // 手袋: ユニフォームの濃い色＋金（差し色）のベルト（2026-11-20）
+          if (/sleeve_paint/.test(lk.acc || '') && /Body_00_SKIN/i.test(o.material.name) && o.isSkinnedMesh && o.material.map) o.material.map = sleeveMap(o, o.material.map, ((pl.r && pl.r.body) || 'm') + '|' + lk.skin);   // 白銀の左腕のアームスリーブ（2026-11-22）
+        }
+        if (lk && LC && LC.eye && LC.eye[lk.eye] && /EyeIris/.test(o.material.name) && o.material.map && !lk.face) o.material.map = vividIris(o.material.map, LC.eye[lk.eye]);   // 黒目の色（2026-11-20。鮮やかに）
+        if (lk && lk.face && /_FACE|_EYE|Face_00_SKIN/.test(o.material.name)) { faceMats[o.material.name.replace(/ \(Instance\)/, '')] = o.material; o.visible = false; }   // サンプルの顔に付け替える人: 元の顔は隠す
+        o.material.userData.t0 = o.material.transparent;   // もとから透ける材質（目・まつげなど）
+        mats.push(o.material);
+      });
+      if (pl.build) obj.scale.set(SCALE * pl.build, SCALE, SCALE * pl.build);   // 体の太さ（パワー）
+      const posture = shapeBody(obj, pl.r && pl.r.look && pl.r.look.body);   // 体型（2026-11-22）
+      // 髪型を頭の骨に付ける（体ごとに測った頭の形に沿わせる）
+      { const lk = pl.r && pl.r.look, LC = window.LOOK_COLOR;
+        if (lk && lk.hs && LC && LC.hair[lk.hair]) {
+          let head = null, top = null; obj.traverse((o) => { if (!head && o.isBone && /Head$/.test(o.name)) head = o; if (!top && o.isBone && /HeadTop_End$/.test(o.name)) top = o; });
+          if (head) {
+            obj.updateMatrixWorld(true);
+            const hm = /^s_/.test(lk.hs) ? strandHair(lk.hs, LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head))   // 毛束で作った髪型
+              : /^([vm]\d|s[A-Z]|c\d+(v\d+[a-z]?)?)$/.test(lk.hs) ? (vroidHair(lk.hs, LC.hair[lk.hair], head, top, obj, headShape((pl.r && pl.r.body) || 'm', obj, head), lk.tip === 'none' ? LC.hair[lk.hair] : lk.pc) || hairMesh(VHAIR_FALLBACK[lk.hs], LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head)))   // VRoid の髪型（まだ読めていなければ、近い髪型で代わり）
+              : hairMesh(lk.hs, LC.hair[lk.hair], headShape((pl.r && pl.r.body) || 'm', obj, head));
+            if (hm) { head.add(hm); hm.traverse((o) => { if (o.isMesh) mats.push(o.material); }); }
+          }
+        }
+        // サンプルの顔・メガネ（2026-11-20）
+        if (lk && (lk.face || lk.acc === 'glassesV')) {
+          let head = null; obj.traverse((o) => { if (!head && o.isBone && /Head$/.test(o.name)) head = o; });
+          if (head) {
+            obj.updateMatrixWorld(true);
+            const H = headShape((pl.r && pl.r.body) || 'm', obj, head);
+            for (const key of [lk.face ? 'f' + lk.face : null, lk.acc === 'glassesV' ? 'gV' : null]) {
+              if (!key) continue;
+              const fm = vroidFace(key, head, obj, H, lk, faceMats);
+              if (fm) { head.add(fm); fm.traverse((o) => { if (o.isMesh) mats.push(o.material); }); }
+              else if (key[0] === 'f') obj.traverse((o) => { if (o.isMesh && /_FACE|_EYE|Face_00_SKIN/.test(o.material.name)) o.visible = true; });   // まだ読めていなければ元の顔のまま
+            }
+          }
+        }
+      }
+      // 小物を骨に付ける
+      const lk2 = pl.r && pl.r.look;
+      for (const accKind of ((lk2 && lk2.acc) || '').split('+')) {   // 小物は「+」で2つ以上付けられる（2026-11-20）
+        const am = accMesh(accKind); if (!am) continue;
+        obj.updateMatrixWorld(true);
+        let bone = null; const want = { top: /HeadTop_End$/, head: /Head$/, lhand: /LeftHand$/, rhand: /RightHand$/, larm: /LeftForeArm$/, uparm: /LeftArm$/, neck: /Neck$/ }[am.at] || /LeftHand$/;
+        obj.traverse((o) => { if (!bone && o.isBone && want.test(o.name)) bone = o; });
+        if (bone) {
+          const ws = new THREE.Vector3(); bone.getWorldScale(ws);
+          let hk = 1;   // 頭に付ける小物は、頭の大きさに合わせる（標準男性の顔の高さ 0.181m が基準）
+          if ((am.at === 'top' || am.at === 'head') && pl.r && pl.r.look && pl.r.look.hs) { let hd = null; obj.traverse((o) => { if (!hd && o.isBone && /Head$/.test(o.name)) hd = o; }); if (hd) { const H = headShape(pl.r.body || 'm', obj, hd), hw = new THREE.Vector3(); hd.getWorldScale(hw); if (H.faceTop > 0) hk = H.faceTop * hw.y / 0.181; } }
+          am.g.scale.set(hk / ws.x * (pl.build || 1), hk / ws.y, hk / ws.z * (pl.build || 1));   // m → 骨の大きさ（体の太さの分は戻す）
+          bone.add(am.g);
+          am.g.traverse((o) => { if (o.isMesh) mats.push(o.material); });
+        }
+      }
+      const rig = new THREE.Group(); rig.add(obj); scene.add(rig);
+      let spine = null; obj.traverse((o) => { if (/Spine1$/.test(o.name)) spine = o; });
+      const mixer = new THREE.AnimationMixer(obj);
+      const act = {};
+      for (const n of ['idle', 'defense_idle', ...LOCO]) { act[n] = mixer.clipAction(clips[n]); act[n].play(); act[n].setEffectiveWeight(0); }
+      for (const n of LOCO) act[n].timeScale = 0;
+      act.idle.setEffectiveWeight(1);
+      // 1回だけの動き（投げる・捕る・飛びつく・起き上がる・喜ぶ）
+      for (const n of ['throw', 'throw_2', 'catch', 'jump_catch', 'dive', 'get_up', 'celebrate', ...Object.values(MOCAP).map((m) => m.name)]) {
+        if (!clips[n]) continue;
+        act[n] = mixer.clipAction(clips[n]); act[n].setLoop(THREE.LoopOnce); act[n].clampWhenFinished = true;
+      }
+      const heldDisc = attachDisc(obj, SCALE);
+      const arm = {}; obj.traverse((o) => { const m = /(RightForeArm|RightHand|Head)$/.exec(o.name); if (m) arm[m[1]] = o; });
+      return { obj, rig, spine, mixer, act, mats, heldDisc, arm, posture, yaw: 0, prev: null, speed: 0, phase: Math.random(), bank: 0, pitch: 0, oneShot: null, oneT: 0, alpha: 1 };
+    }
+    const VIS = new Map();   // 試合の選手 → 3Dの選手
+
+    // 1回だけの動きを始める（走りの上に重ねて、終わったら戻す）
+    function playOnce(v, name, dur, from = 0) {
+      const a = v.act[name]; if (!a) return;
+      if (v.oneShot && v.act[v.oneShot] && v.oneShot !== name) v.act[v.oneShot].fadeOut(0.25);
+      a.reset(); a.time = from; a.setEffectiveWeight(1); a.fadeIn(0.25); a.play();   // 混ぜ始めを長めに（なめらかに）
+      v.oneShot = name; v.oneT = (dur || clips[name].duration) - from;
+    }
+    // 試合からのきっかけを、どの動きで見せるかに置きかえる
+    //   ev: 'catch' / 'jump_catch' / 'dive' など（文字）、または { name: 'windup' | 'throw', type, yaw }
+    function startEvent(v, ev, s) {
+      const name = typeof ev === 'string' ? ev : ev.name;
+      if (name === 'windup' || name === 'throw') {
+        const m = throwMocap(ev.type);
+        v.lockYaw = ev.yaw;   // 投げる向きを向く
+        if (m) {
+          // 投げ終わりは手を離して 0.45 秒で走りの動きへ戻す（投げ終わりの姿勢のまま体が滑らないように）
+          if (name === 'windup') playOnce(v, m.name, m.release + 0.45);                 // 振りかぶりから
+          else if (v.oneShot !== m.name) playOnce(v, m.name, m.release + 0.45, Math.max(0, m.release - 0.08));   // 振りかぶりが無かった投げは、手を離す直前から
+          v.mocapShot = true;
+        } else if (name === 'throw') { playOnce(v, ev.type === 'hammer' || ev.type === 'scoober' || ev.type === 'heli' ? 'throw_2' : 'throw'); v.mocapShot = false; }
+        return;
+      }
+      if (name === 'catch' || name === 'jump_catch') {
+        const pool = name === 'jump_catch' ? ['jump_catch'] : ['catch', 'catch_2', 'catch_3'];
+        const ok = pool.filter((n) => MOCAP[n]);
+        if (ok.length) {
+          const m = MOCAP[ok[Math.floor(Math.random() * ok.length)]];
+          playOnce(v, m.name, Math.min(m.dur, m.release + 0.5), Math.max(0, m.release - 0.25));   // 捕る瞬間の前後だけ（余計な構え直しを入れない）
+          v.mocapShot = true;
+          v.lockYaw = typeof ev === 'object' && ev.yaw != null ? ev.yaw : null;   // ディスクの来た方を向く
+          return;
+        }
+      }
+      if (v.act[name]) { playOnce(v, name); v.mocapShot = false; v.lockYaw = null; }
+    }
+
+    const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+    const toRotY = (yaw) => Math.atan2(Math.sin(yaw), -Math.cos(yaw));
+    const _ax = new THREE.Vector3(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion();
+    function addWorldRot(bone, axis, angle) {
+      bone.parent.getWorldQuaternion(_pq);
+      _q.setFromAxisAngle(axis, angle);
+      const inv = _pq.clone().invert();
+      bone.quaternion.premultiply(inv.multiply(_q).multiply(_pq));
+    }
+
+    // 1人分の動き。s: { p, lookAt, pose, faceLook, event }
+    function animate(pl, v, s, dt) {
+      // 見た目の位置と速さをならす: 試合の計算は毎コマ「目標へ向かう速さ」を決め直すので、位置と向きが細かく揺れる。
+      //   速さは少し遅れて追う（ならす）。見た目の位置は、ならした速さで進めつつ、本当の位置へ少しずつ寄せる
+      //   （一定の速さで走っているときは、本当の位置とずれない）
+      const gp = s.p;
+      if (!v.prev) { v.prev = gp.slice(); v.vpos = gp.slice(); v.svel = [0, 0]; }
+      let rvx = (gp[0] - v.prev[0]) / dt, rvy = (gp[1] - v.prev[1]) / dt;
+      v.prev = gp.slice();
+      const jump = Math.hypot(gp[0] - v.vpos[0], gp[1] - v.vpos[1]);
+      if (Math.hypot(rvx, rvy) > 15 || jump > 3) { v.vpos = gp.slice(); v.svel = [0, 0]; rvx = rvy = 0; }   // 瞬間移動（並び直しなど）
+      const kv = Math.min(1, dt * (s.pose === 'down' ? 30 : 9)), kp = Math.min(1, dt * (s.pose === 'down' ? 25 : 5));
+      v.svel[0] += (rvx - v.svel[0]) * kv; v.svel[1] += (rvy - v.svel[1]) * kv;
+      v.vpos[0] += v.svel[0] * dt + (gp[0] - v.vpos[0]) * kp;
+      v.vpos[1] += v.svel[1] * dt + (gp[1] - v.vpos[1]) * kp;
+      const p = v.vpos, vx = v.svel[0], vy = v.svel[1];
+      let sp = Math.hypot(vx, vy);
+      const prevSpeed = v.speed;
+      v.speed += (sp - v.speed) * Math.min(1, dt * 6);
+      const accel = (v.speed - prevSpeed) / dt;
+      // 向き: 速く走るときは進む向き。ディスクや相手を見ながら動くときは、そちらを向いたまま横・後ろへ動く
+      const moveYaw = Math.atan2(vx, vy);
+      let wantYaw = v.yaw;
+      if ((v.oneShot || v.holdAct) && v.lockYaw != null) wantYaw = v.lockYaw;
+      else if (s.pose === 'down' && s.diveDir) wantYaw = R3D.loco.includes('dive') ? Math.atan2(s.diveDir[0], s.diveDir[1]) : Math.atan2(-s.diveDir[1], s.diveDir[0]);   // 新しい飛びつき（前へ飛び込む）は正面を、Mixamo の飛びつき（右へ跳ぶ）は右手側を、跳ぶ向きに合わせる
+      else if (s.faceLook && s.lookAt && v.speed < 5) wantYaw = Math.atan2(s.lookAt[0] - p[0], s.lookAt[1] - p[1]);
+      else if (v.speed > 0.6) wantYaw = moveYaw;
+      else if (s.lookAt) wantYaw = Math.atan2(s.lookAt[0] - p[0], s.lookAt[1] - p[1]);
+      const oldYaw = v.yaw;
+      // 向きの変え方: 回る速さを少しずつ上げ下げする（急に回り出したり、ぴたっと止まったりしない）
+      const turnRate = s.pose === 'down' ? 30 : (v.oneShot || v.holdAct) ? 6 : v.speed < 1.5 ? 9 : v.speed < 4 ? 6 : 4;
+      const wantRate = Math.max(-turnRate, Math.min(turnRate, wrap(wantYaw - v.yaw) * 7));
+      v.yawVel = (v.yawVel || 0) + (wantRate - (v.yawVel || 0)) * Math.min(1, dt * (s.pose === 'down' ? 30 : 10));
+      v.yaw = wrap(v.yaw + v.yawVel * dt);
+      // 体の向きから見た動き（前後・左右）
+      const fwd = (vx * Math.sin(v.yaw) + vy * Math.cos(v.yaw)), side = (vx * Math.cos(v.yaw) - vy * Math.sin(v.yaw));   // side>0: 右へ
+      // 動きの混ぜ方
+      const w = { idle: 0, defense_idle: 0, jog: 0, sprint: 0, backpedal: 0, strafe_left: 0, strafe_right: 0 };
+      const stand = s.pose === 'marker' ? 'defense_idle' : 'idle';
+      const vs = v.speed;
+      if (vs < 0.4) w[stand] = 1;
+      else {
+        const run = Math.max(0, Math.min(1, (vs - 0.4) / 0.6));
+        w[stand] = 1 - run;
+        const af = Math.abs(fwd), as = Math.abs(side), tot = af + as + 1e-6;
+        let kf = af / tot, ks = as / tot;
+        if (kf > 0.75) { kf = 1; ks = 0; } else if (ks > 0.75) { ks = 1; kf = 0; }
+        if (fwd >= 0) {
+          if (vs < NAT.jog) w.jog += run * kf;
+          else { const k = Math.min(1, (vs - NAT.jog) / (NAT.sprint - NAT.jog)); w.jog += run * kf * (1 - k); w.sprint += run * kf * k; }
+        } else w.backpedal += run * kf;
+        w[side > 0 ? 'strafe_right' : 'strafe_left'] += run * ks;
+      }
+      const busy = v.oneShot ? (v.mocapShot ? 0 : 0.25) : 1;   // 1回だけの動きの最中は、走りを弱く重ねる（動画の動きは重ねない）
+      let Lsum = 0, Wsum = 0;
+      for (const n in w) {
+        const a = v.act[n], cur = a.getEffectiveWeight();
+        a.setEffectiveWeight(cur + (w[n] * busy - cur) * Math.min(1, dt * 7));   // 走り・待機などの混ぜ具合はゆっくり変える
+        if (STRIDE[n]) { const ew = a.getEffectiveWeight(); Lsum += ew * STRIDE[n]; Wsum += ew; }
+      }
+      // 足の運び: 歩幅で割った分だけ進める。疾走より速いときは、歩幅も少し伸ばす（足の回転が速くなりすぎないように）
+      let L = Wsum > 1e-3 ? Lsum / Wsum : STRIDE.jog;
+      if (vs > NAT.sprint) L *= Math.sqrt(vs / NAT.sprint);
+      v.phase = (v.phase + dt * vs / L) % 1;
+      for (const n of LOCO) v.act[n].time = v.phase * clips[n].duration;
+      // 1回だけの動き
+      if (s.event) startEvent(v, s.event, s);
+      // ディスクを持っている間: 動画の「持ち替え（ピボット）」をくり返す。投げる動きが始まったら止める
+      const holdOk = s.holding && !v.oneShot;
+      const HOLDS = ['hold_fb', 'hold_fh', 'hold_hb'].filter((n) => MOCAP[n]);
+      if (holdOk && HOLDS.length && !v.holdAct) {
+        const m = MOCAP[HOLDS[Math.floor(Math.random() * HOLDS.length)]];
+        v.holdAct = v.act[m.name]; v.holdAct.setLoop(THREE.LoopRepeat, Infinity); v.holdAct.clampWhenFinished = false;
+        v.holdAct.reset(); v.holdAct.time = Math.random() * m.dur; v.holdAct.timeScale = 0.75;   // 持ち替えは少しゆっくり（せわしなくならないように）
+        v.holdAct.setEffectiveWeight(1); v.holdAct.fadeIn(0.4); v.holdAct.play();
+      } else if (!holdOk && v.holdAct) { v.holdAct.fadeOut(0.3); v.holdAct = null; }
+      if (v.holdAct) { for (const n in w) v.act[n].setEffectiveWeight(0); v.lockYaw = s.holdYaw; }
+      if (v.oneShot) {
+        v.oneT -= dt;
+        if (v.oneT <= 0 && !(s.pose === 'down' && v.oneShot === 'dive')) { v.act[v.oneShot].fadeOut(0.35); v.oneShot = null; v.lockYaw = null; v.mocapShot = false; }
+      }
+      v.mixer.update(dt);
+      if (v.posture) for (const p of v.posture) p.b.quaternion.multiply(p.q);   // 背中の丸み（体型。2026-11-22）
+      // 体の傾き（曲がる内側へ・加速で前へ・減速で後ろへ）
+      const yawRate = wrap(v.yaw - oldYaw) / dt;
+      const wantBank = Math.max(-0.2, Math.min(0.2, Math.atan(vs * yawRate / 9.8))) * Math.min(1, vs / 3) * (kfOf(fwd, side));
+      const wantPitch = Math.max(-0.12, Math.min(0.12, accel * 0.015)) * (fwd >= 0 ? 1 : 0);
+      v.bank += (wantBank - v.bank) * Math.min(1, dt * 5);
+      v.pitch += (wantPitch - v.pitch) * Math.min(1, dt * 6);
+      v.rig.position.copy(W3(p[0], p[1], s.jz || 0));   // ジャンプ中は持ち上げる
+      if (s.scale) v.rig.scale.setScalar(s.scale);   // 背の高さ（選手ごと）
+      v.rig.rotation.set(0, toRotY(v.yaw), 0);
+      v.obj.rotation.set(0, 0, 0);
+      if (!v.oneShot && !v.holdAct) v.obj.rotateZ(v.bank * 0.8);
+      if (v.spine && Math.abs(v.pitch) > 1e-3 && !v.oneShot && !v.holdAct) {
+        v.rig.updateMatrixWorld(true);
+        _ax.set(1, 0, 0).applyQuaternion(v.rig.quaternion);
+        addWorldRot(v.spine, _ax, v.pitch);
+      }
+      v.armW = (v.armW || 0) + ((s.armsUp || 0) - (v.armW || 0)) * Math.min(1, dt * 14);   // 両手を上げる強さ（なめらかに上げ下げ）
+      if (v.armW > 0.01) blockPose(v, s, v.armW);
+      if (s.hasDisc) recordPivot(pl, v);
+      v.palmW = (v.palmW || 0) + ((s.hasDisc ? 1 : 0) - (v.palmW || 0)) * Math.min(1, dt * 6);   // 手のひらの向き直しも少しずつ
+      if (v.palmW > 0.01) palmUp(v, v.palmW);
+      smoothUpper(v, dt);
+    }
+    // 両手を上げる（ジャンプしてブロックするマーク。2026-11-21）: 上腕と前腕を、まっすぐ上から少し外へ開いた向きへ回す。w: 0〜1
+    const _ua = new THREE.Vector3(), _ub = new THREE.Vector3(), _uc = new THREE.Vector3(), _ud = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
+    function aimBone(b, c, dir, w) {   // 骨 b を、子の骨 c へ向かう向きが dir になるように回す（w の分だけ）
+      b.getWorldPosition(_ua); c.getWorldPosition(_ub); _uc.subVectors(_ub, _ua).normalize();
+      _qa.setFromUnitVectors(_uc, dir); _qb.identity().slerp(_qa, w);
+      b.getWorldQuaternion(_qa); _qa.premultiply(_qb);
+      b.parent.getWorldQuaternion(_qb); b.quaternion.copy(_qb.invert().multiply(_qa)); b.updateMatrixWorld(true);
+    }
+    function raiseArms(v, w) {
+      if (!v.raise) { v.raise = {}; v.obj.traverse((o) => { const mm = /(LeftArm|LeftForeArm|LeftHand|RightArm|RightForeArm|RightHand)$/.exec(o.name); if (mm && o.isBone) v.raise[mm[1]] = o; }); }
+      const B = v.raise; if (!B.LeftArm || !B.RightArm || !B.LeftForeArm || !B.RightForeArm || !B.LeftHand || !B.RightHand) return;
+      v.rig.updateMatrixWorld(true);
+      B.LeftArm.getWorldPosition(_ua); B.RightArm.getWorldPosition(_ub); _ud.subVectors(_ua, _ub).normalize();   // 体の左向き
+      for (const [S, sg] of [['Left', 1], ['Right', -1]]) {
+        const dir = new THREE.Vector3(0, 1, 0).addScaledVector(_ud, sg * 0.22).normalize();   // 真上から少し外へ
+        aimBone(B[S + 'Arm'], B[S + 'ForeArm'], dir, w);
+        aimBone(B[S + 'ForeArm'], B[S + 'Hand'], dir, w);   // ひじを伸ばす
+      }
+    }
+    // バスケのブロック（2026-11-21）: w は構えの強さ（0〜1）、s.jumpT は跳んでからの秒、s.jumpDur は滞空の秒
+    const _bl = new THREE.Vector3(), _bf = new THREE.Vector3(), _bu = new THREE.Vector3(0, 1, 0), _bt = new THREE.Vector3();
+    const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+    function blockPose(v, s, w) {
+      if (!v.raise) { v.raise = {}; v.obj.traverse((o) => { const mm = /(LeftArm|LeftForeArm|LeftHand|RightArm|RightForeArm|RightHand|LeftUpLeg|LeftLeg|LeftFoot|RightUpLeg|RightLeg|RightFoot|Spine|Neck)$/.exec(o.name); if (mm && o.isBone) v.raise[mm[1]] = o; }); }
+      const B = v.raise; if (!B.LeftArm || !B.RightArm || !B.LeftForeArm || !B.RightForeArm || !B.LeftHand || !B.RightHand) return;
+      const t = s.jumpT >= 0 ? s.jumpT : 0, D = s.jumpDur || 0.6, k = t / D;   // k: 滞空の中での進み（0＝踏み切り、0.5＝最高点、1＝着地）
+      v.rig.updateMatrixWorld(true);
+      B.LeftArm.getWorldPosition(_ua); B.RightArm.getWorldPosition(_ub); _bl.subVectors(_ua, _ub).normalize();   // 体の左向き
+      _bf.crossVectors(_bl, _bu).normalize();   // 体の前向き
+      // はたく手は利き手（2026-11-21 林さん「ブロックは利き手だけあげて」）
+      const sg = s.hand === 'L' ? 1 : -1, H = sg > 0 ? 'Left' : 'Right', O = sg > 0 ? 'Right' : 'Left';
+      // 体: 少し前へ倒し、はたく手の側へ伸び上がる（最高点で最大）
+      const air = Math.sin(Math.PI * Math.max(0, Math.min(1, k)));
+      if (B.Spine && B.Neck) {   // 背すじ: 空中ではほぼまっすぐ立て（少し前・はたく手の側へ）、地面ではもとの構え
+        const sp = new THREE.Vector3().copy(_bu).addScaledVector(_bf, 0.18).addScaledVector(_bl, sg * 0.12).normalize();
+        aimBone(B.Spine, B.Neck, sp, 0.9 * air * w);
+      }
+      B.LeftArm.getWorldPosition(_ua); B.RightArm.getWorldPosition(_ub); _bl.subVectors(_ua, _ub).normalize(); _bf.crossVectors(_bl, _bu).normalize();   // 背すじを直したので向きを取り直す
+      // はたく手: 上（少し前・少し内側）へ伸ばす。最高点のあと（k 0.5〜0.75）で、前へ振り下ろす
+      const st = s.swatT != null ? s.swatT : -1, swat = st >= 0 && st < 0.7 ? smooth01(st / 0.1) * (1 - smooth01((st - 0.35) / 0.25)) : 0;   // 止めた瞬間から振り下ろす
+      const reach = new THREE.Vector3().copy(_bu).addScaledVector(_bf, 0.22).addScaledVector(_bl, -sg * 0.08).normalize();
+      const down = new THREE.Vector3().copy(_bu).multiplyScalar(0.55).addScaledVector(_bf, 0.85).addScaledVector(_bl, -sg * 0.1).normalize();
+      const upDir = reach.clone().lerp(down, swat * 0.55).normalize(), foreDir = reach.clone().lerp(down, swat).normalize();
+      aimBone(B[H + 'Arm'], B[H + 'ForeArm'], upDir, w);
+      aimBone(B[H + 'ForeArm'], B[H + 'Hand'], foreDir, w);
+      if (swat > 0.01) { addWorldRot(B[H + 'Hand'], _bl, 0.9 * swat * w); B[H + 'Hand'].updateMatrixWorld(true); }   // 手首を返してはたく
+      // 反対の手は上げない（いつもの構えのまま）
+      // 脚: 空中でひざを曲げてたたむ（はたく手と反対側の脚を強め）。地面にいる間（踏み切り前・着地後）は曲げない
+      const tuck = Math.sin(Math.PI * Math.max(0, Math.min(1, (k - 0.05) / 0.9)));
+      if (tuck > 0.01 && B.LeftUpLeg && B.LeftLeg && B.RightUpLeg && B.RightLeg) {
+        for (const [S, a] of [[H, 0.6], [O, 1.0]]) {   // ももはほぼ真下（少し前）、すねは後ろへ（ひざを軽く曲げる）。はたく手と反対の脚を強め
+          if (!B[S + 'Foot']) continue;
+          const th = new THREE.Vector3().copy(_bu).multiplyScalar(-Math.cos(0.3 * a)).addScaledVector(_bf, Math.sin(0.3 * a)).addScaledVector(_bl, (S === 'Left' ? 1 : -1) * 0.06).normalize();
+          const sh = new THREE.Vector3().copy(_bu).multiplyScalar(-Math.cos(0.75 * a)).addScaledVector(_bf, -Math.sin(0.75 * a)).normalize();
+          aimBone(B[S + 'UpLeg'], B[S + 'Leg'], th, tuck * w);
+          aimBone(B[S + 'Leg'], B[S + 'Foot'], sh, tuck * w);
+        }
+      }
+    }
+    // 持っている人のピボット: 腰から見て、遠い方の足（踏み出した足）がどこにあるか（試合の座標で [横, 縦] m）。
+    //   試合側（match.js）がマークの立ち位置をずらすのに使う
+    R3D.pivot = new Map();
+    const _f1 = new THREE.Vector3(), _f2 = new THREE.Vector3(), _hp = new THREE.Vector3();
+    function recordPivot(pl, v) {
+      if (!v.feet) { v.feet = {}; v.obj.traverse((o) => { const m = /(LeftFoot|RightFoot|Hips)$/.exec(o.name); if (m) v.feet[m[1]] = o; }); }
+      const { LeftFoot: lf, RightFoot: rf, Hips: hp } = v.feet; if (!lf || !rf || !hp) return;
+      v.obj.updateMatrixWorld(true);
+      lf.getWorldPosition(_f1); rf.getWorldPosition(_f2); hp.getWorldPosition(_hp);
+      const d1 = Math.hypot(_f1.x - _hp.x, _f1.z - _hp.z), d2 = Math.hypot(_f2.x - _hp.x, _f2.z - _hp.z);
+      const f = d2 > d1 ? _f2 : _f1;
+      R3D.pivot.set(pl, [f.x - _hp.x, -(f.z - _hp.z)]);
+    }
+    // 仕上げのならし: 上半身（背骨・首・頭・肩・腕・手）の骨の回転を、前のコマから少し遅れて追いかけさせる（約0.06秒）。
+    //   動画の読み取りの細かいぶれ、動きの切り替え、手のひらの向き直しなどの「カクッ」を消す。
+    //   脚と腰は、足が地面を滑らないように、ならさない
+    const UPPER = /(Spine\d?|Neck|Head|Shoulder|Arm|ForeArm|Hand)$/;
+    function smoothUpper(v, dt) {
+      // 追いかける速さ（秒）: 首・頭は強め（人も走りながら頭をなるべく揺らさない）、背骨は中くらい、腕は弱め
+      if (!v.upper) { v.upper = []; v.obj.traverse((o) => { if (o.isBone && UPPER.test(o.name)) v.upper.push({ b: o, q: o.quaternion.clone(), tc: /(Neck|Head)$/.test(o.name) ? 0.12 : /Spine/.test(o.name) ? 0.08 : 0.06 }); }); }
+      for (const u of v.upper) { u.q.slerp(u.b.quaternion, 1 - Math.exp(-dt / u.tc)); u.b.quaternion.copy(u.q); }
+    }
+    // フォア・バックの構えでは手のひらを上に向ける（林さんの指摘）。
+    //   動画からの置きかえは「腕のねじり」を読み取れないので、手のひらの向きがばらばらになる。
+    //   前腕を、その長さの向きの軸まわりにねじって、手のひら（手の骨の +Z）が上を向くようにする。
+    //   ハマー（手が頭より高い）では、ねじらない（手の高さで少しずつ弱める）
+    const _a = new THREE.Vector3(), _n = new THREE.Vector3(), _u = new THREE.Vector3(), _hq = new THREE.Quaternion(), _p1 = new THREE.Vector3(), _p2 = new THREE.Vector3();
+    function palmUp(v, k = 1) {
+      const { RightForeArm: fa, RightHand: hd, Head: head } = v.arm;
+      if (!fa || !hd || !head) return;
+      v.obj.updateMatrixWorld(true);
+      fa.getWorldPosition(_p1); hd.getWorldPosition(_p2);
+      _a.copy(_p2).sub(_p1).normalize();                         // 前腕の向き
+      hd.getWorldQuaternion(_hq);
+      _n.set(0, 0, 1).applyQuaternion(_hq);                       // 手のひらの向き
+      _u.set(0, 1, 0);
+      _n.addScaledVector(_a, -_n.dot(_a)); _u.addScaledVector(_a, -_u.dot(_a));   // 前腕に垂直な面へ
+      if (_n.lengthSq() < 1e-6 || _u.lengthSq() < 1e-6) return;  // 前腕が真上・真下のときは決められない
+      _n.normalize(); _u.normalize();
+      let ang = Math.acos(Math.max(-1, Math.min(1, _n.dot(_u))));
+      if (new THREE.Vector3().crossVectors(_n, _u).dot(_a) < 0) ang = -ang;
+      head.getWorldPosition(_p1);
+      const w = Math.max(0, Math.min(1, (_p1.y - _p2.y) / 0.3));  // 手が頭より高いほど弱める（ハマー）
+      if (w > 0) addWorldRot(fa, _a, ang * w * k);
+    }
+    const kfOf = (f, s) => Math.abs(f) / (Math.abs(f) + Math.abs(s) + 1e-6);
+
+    // ---------------- 毎フレーム（match.js から呼ぶ） ----------------
+    // st: { W, H, dpr, cam: {e, f, u}, fov, players: [{ pl, p, visible, alpha, pose, lookAt, faceLook, event }], dt }
+    let lastW = 0, lastH = 0;
+    R3D.frame = function (st) {
+      if (st.W !== lastW || st.H !== lastH) {
+        renderer.setPixelRatio(st.dpr); renderer.setSize(st.W / st.dpr, st.H / st.dpr, false);
+        lastW = st.W; lastH = st.H;
+      }
+      camera.fov = st.fov; camera.aspect = st.W / st.H; camera.updateProjectionMatrix();
+      const e = st.cam.e, f = st.cam.f, u = st.cam.u;
+      camera.position.copy(W3(e[0], e[1], e[2]));
+      camera.up.set(u[0], u[2], -u[1]);
+      camera.lookAt(W3(e[0] + f[0], e[1] + f[1], e[2] + f[2]));
+      // 影を落とす範囲は、カメラが見ている先の地面のあたり
+      const k = f[2] < -0.05 ? Math.min(30, e[2] / -f[2]) : 18;
+      const fx = e[0] + f[0] * k, fy = e[1] + f[1] * k;
+      sun.target.position.copy(W3(fx, fy, 0)); sun.position.copy(W3(fx + 25, fy - 15, 45));
+      R3D.sky.position.set(e[0], 640, -e[1]);
+      const dt = Math.max(1 / 240, Math.min(0.05, st.dt || 1 / 60));
+      const seen = new Set();
+      for (const s of st.players) {
+        let v = VIS.get(s.pl);
+        if (!v) { v = makePlayer(s.pl); VIS.set(s.pl, v); }
+        seen.add(s.pl);
+        v.rig.visible = s.visible;
+        if (v.heldDisc && v.heldDisc.visible !== !!s.hasDisc) { v.heldDisc.visible = !!s.hasDisc; v.heldDisc.userData.grip(!!s.hasDisc); }   // ディスクを持っている間（振りかぶり中も）だけ手に出し、親指で挟む
+        if (st.paused) { v.prev = s.p.slice(); v.vpos = s.p.slice(); continue; }   // 作戦タイム中は止める
+        animate(s.pl, v, s, dt);
+        if (Math.abs(s.alpha - v.alpha) > 0.01) {
+          v.alpha = s.alpha;
+          for (const m of v.mats) { m.transparent = v.alpha < 1 || !!m.userData.t0; m.opacity = v.alpha; m.depthWrite = v.alpha >= 1 && !m.userData.t0; m.needsUpdate = true; }
+        }
+      }
+      for (const [pl, v] of VIS) if (!seen.has(pl)) v.rig.visible = false;   // 控えに下がった選手は隠す
+      renderer.render(scene, camera);
+    };
+    // チームの服の色を変える: そのチームの体を消して、次の描画で作り直す
+    R3D.setWear = function (team, top, bottom) {
+      const w = TEAM_WEAR[team]; if (w.top.join() === top.join() && w.bottom.join() === bottom.join()) return;
+      TEAM_WEAR[team] = { top, bottom };
+      for (const [pl, v] of VIS) if (pl.team === team) { scene.remove(v.rig); VIS.delete(pl); }
+    };
+    // 全員の体を作り直す（ユニフォームを変えたとき）
+    R3D.rebuildAll = function () { for (const [, v] of VIS) scene.remove(v.rig); VIS.clear(); };
+    if (window.Uniform) Uniform.ready.then(() => R3D.rebuildAll());   // ユニフォームの素材が読めたら、着替える
+    R3D.renderer = renderer; R3D.vis = VIS; R3D.camera = camera;   // 確認用
+    R3D.ready = true;
+  })();
+})();
+
+</script>
+<script>
 /* ピボットのパッド（試合・攻撃パート・投げ練習で共通。2026-11-18 スライド → 2026-11-18 縦にも動かせるパッドに）
  *   横 a（-1〜+1）: 踏み出す足の向き。足を置ける場所は「体のうしろ側の半円」
  *     a = -1: 左真横（0.8m） … a = 0: 真後ろ（0.6m） … a = +1: 右真横（0.8m）
@@ -1161,6 +2857,13 @@
     CUT_MIN: 0.7, CUT_MAX: 1.4, MAX_CUTTERS: 3,   // 味方のカットの間隔[s]と、同時にカットする人数
   };
   const MARK_DIST = 3.0, MARK_ARM = 0.9;
+  // 守りの強さ（2026-11-21）。ふつう＝今までの数。sky は空中戦での赤のうまさ（試合の CP の強さと同じ名前）
+  const DEF_LV = {
+    none: { name: 'なし' },
+    weak: { name: '弱い', t: { D_SPEED: 6.0, D_ACC: 8, D_REACH: 0.75, D_REACT: 0.4, D_LAG: 0.8, BLOCK_P: 0.6 }, sky: 'normal' },
+    normal: { name: 'ふつう', t: { D_SPEED: 6.8, D_ACC: 10, D_REACH: 0.9, D_REACT: 0.3, D_LAG: 0.6, BLOCK_P: 1.0 }, sky: 'strong' },
+    strong: { name: '強い', t: { D_SPEED: 7.4, D_ACC: 13, D_REACH: 1.0, D_REACT: 0.2, D_LAG: 0.45, BLOCK_P: 1.0 }, sky: 'max' },
+  };
   // マークの手の届きやすさ: 低いディスクほど届きにくい（0.9m以上は必ず届く）。上は手を伸ばして・跳んで 2.8m まで（2.3m より高いほど届きにくい）
   const lowReach = (z) => clamp((z - 0.55) / 0.35, 0, 1) * clamp((2.8 - z) / 0.5, 0, 1);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -1191,6 +2894,32 @@
   const D = [1, 2, 4, 6, 8, 10, 12].map((n) => mk(1, n));    // 相手（赤）
   D.forEach((d, i) => { d.mark = O[i]; O[i].def = d; });
   const ALL = O.concat(D);
+  // 3D の選手（試合と同じ体・髪・顔・ユニフォーム。2026-11-21）: 青の先発とユニフォームはチーム作りの画面で決めたもの
+  const ROSTER = window.UFPS_ROSTER;
+  (function teamSetup() {
+    const st = window.TeamUI ? TeamUI.load() : null; if (!st) return;
+    st.starters.forEach((n, i) => { if (O[i]) O[i].n = n; });
+    const c = TeamUI.COLORS[st.color] || TeamUI.COLORS.white;
+    window.UFPS_WEAR0 = { top: c.top, bottom: c.bottom };
+    if (window.Uniform) {
+      const d0 = Uniform.DESIGNS[st.design] ? st.design : 'cr_ivory', chest = /^[A-Za-z0-9 .\-&']+$/.test(st.name || '') ? st.name : '';
+      window.UFPS_KIT = [{ design: d0, pal: Uniform.PALETTE[st.color] || Uniform.PALETTE.white, chest }, { design: d0 === 'topo' ? 'side' : 'topo', pal: Uniform.PALETTE.red, chest: '' }];
+    }
+  })();
+  ALL.forEach((pl) => { pl.r = ROSTER[pl.team][pl.n]; pl.hScale = (1.79 + 0.065 * (pl.r.st.hgt - 50) / 20) / 1.79; pl.build = 1 + 0.035 * (pl.r.st.pow - 50) / 20; });
+  // 能力の倍率（試合の refreshK と同じ式。2026-11-21）
+  const interp = (tbl, x) => { const i = clamp(x + 2, 0, tbl.length - 1.001), a = Math.floor(i); return tbl[a] + (tbl[a + 1] - tbl[a]) * (i - a); };
+  const randn = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  ALL.forEach((pl) => {
+    const st = pl.r.st, v = (key) => clamp((st[key] - 50) / 20, -2.45, 2.45);
+    pl.k = { spd: 1 + 0.04 * v('spd'), acc: 1 + 0.075 * v('cut'), reach: 0.075 * v('ctch'), react: -0.025 * v('rea'), pow: 1 + 0.05 * v('pow'),
+      errDeg: interp([1.2, 0.8, 0.5, 0.3, 0.15], v('acc')), lag: interp([1.4, 1.2, 1, 0.85, 0.7], v('iq')),
+      h: 0.125 * (st.hgt - 50) / 20, layAdd: 0.15 * v('pow'), jumpEx: clamp(0.12 * v('hgt') + (pl.r.traits.includes('sky') ? 0.06 : 0), -0.25, 0.35) };
+  });
+  const hasT = (pl, t) => !!(pl && pl.r && pl.r.traits.includes(t));   // 個性
+  const stOf = (pl, key) => (pl && pl.r ? pl.r.st[key] : 50);
+  const EV3D = new Map(), ev3d = (pl, e) => EV3D.set(pl, e);   // 3D の選手の1回だけの動き（投げる・捕る・喜ぶ）
+  const use3d = () => !!(window.R3D && window.R3D.ready);
 
   // ---------------- ゲームの状態 ----------------
   const G = {
@@ -1198,6 +2927,7 @@
     phase: 'hold',            // hold（持っている）/ flight（飛んでいる）/ trans（視点が飛ぶ）/ dead（区切り）/ over（試合終了）
     holder: O[0], thrower: null, disc: null, throwEye: null, intended: null, throughSpot: null,
     stall: 0, score: 0, turnovers: 0, passes: 0,
+    throws: 0, longest: 0, skyWin: 0, layWin: 0, playT: 0,   // 結果の画面に出す成績（2026-11-21）
     msg: '', msgT: 0, big: '', bigT: 0, deadT: 0,
     cutT: 1.2, predT: 0,
     trans: null,
@@ -1209,6 +2939,14 @@
     autoLook: true,
     keys: {},
   };
+  function setDefLevel(lv) {   // 守りの強さを変える（覚えておく）
+    if (!DEF_LV[lv]) lv = 'normal';
+    G.defLv = lv; G.noDef = lv === 'none';
+    if (DEF_LV[lv].t) Object.assign(T, DEF_LV[lv].t);
+    G.cpLevel = DEF_LV[lv].sky || 'strong';
+    try { localStorage.setItem('ufps_drill', JSON.stringify({ def: lv })); } catch (e) { /* 覚えられない環境 */ }
+  }
+  setDefLevel((() => { try { return JSON.parse(localStorage.getItem('ufps_drill') || '{}').def; } catch (e) { return null; } })() || 'normal');
   const openSide = () => (G.hand === 'R' ? 1 : -1);   // フォアハンド側（マークが空けている側）: 右利きなら +x
 
   // ---------------- 投げ方まわり（練習モードと同じ） ----------------
@@ -1218,9 +2956,40 @@
     if (pv === 'LT' || pv === 'RT') return pv[0] === bhSide ? 'scoober' : 'highfore';   // 上の段の左右
     return pv === bhSide ? 'backhand' : 'forehand';
   }
-  const noWrist = (type) => type === 'hammer' || type === 'scoober';   // 頭の上・肩越しの投げ: 手首のクセをかけない・ノーズは 0
-  const currentType = () => typeOfPivot(G.pivot, G.hand);
-  const PIVOT_LABEL = { L: '左へ踏む', B: '後ろへ踏む・高く', R: '右へ踏む', LT: '左へ踏む・高く', RT: '右へ踏む・高く' };
+  const noWrist = (type) => type === 'hammer' || type === 'scoober' || type === 'heli';   // 頭の上・肩越しの投げ: 手首のクセをかけない・ノーズは 0
+  // ===== 特殊スロー（試合 match.js と同じ。2026-11-21） =====
+  const SP_NAME = { scoober: 'スクーバ', highfore: 'ハイフォア', air: 'エアバウンド', sharp: 'シャープカーブ', big: 'ビッグカーブ', heli: 'ヘリコプター' };
+  function spCodes(pl, hand) {   // その選手のパッドの区間コード → 特殊スロー（利き手で左右が入れかわる）
+    const sp = (pl && pl.r && pl.r.sp) || {}, bh = hand === 'R' ? 'L' : 'R', fh = bh === 'L' ? 'R' : 'L', out = {};
+    if (sp.bhT) out[bh + 'T'] = sp.bhT; if (sp.fhT) out[fh + 'T'] = sp.fhT;
+    if (sp.bhM) out[bh + 'M'] = sp.bhM; if (sp.fhM) out[fh + 'M'] = sp.fhM;
+    if (sp.bhD) out[bh + 'D'] = sp.bhD; if (sp.fhD) out[fh + 'D'] = sp.fhD;
+    if (sp.C) out.C = sp.C;
+    return out;
+  }
+  function throwOf(pl, pv, hand) {   // 区間 → 投げ方（type）と特殊（sp）。持っていない上の段は sp = 'bad'
+    const codes = spCodes(pl, hand), bh = hand === 'R' ? 'L' : 'R', side = pv[0], base = side === bh ? 'backhand' : 'forehand';
+    if (pv === 'B') return { type: 'hammer', sp: null };
+    if (pv === 'C') return codes.C ? { type: 'heli', sp: 'heli' } : { type: 'hammer', sp: null };
+    if (pv === 'LT' || pv === 'RT') { const c = codes[pv]; return c ? { type: c, sp: c } : { type: base, sp: 'bad' }; }
+    if (pv.length === 2 && codes[pv]) return { type: base, sp: codes[pv] };
+    return { type: base, sp: null };
+  }
+  const SPX = { airNose: 22, airDrop: 0.45, sharpHyzer: 26, sharpSpeed: 1.2, bigNose: 0, bigArc: 100,
+    edge: { air: { block: 0.45, react: 0 }, scoober: { block: 0.45, react: 0 }, highfore: { block: 0.5, react: 0 }, sharp: { block: 0.6, react: 0.15 }, big: { block: 0.6, react: 0.25 }, heli: { block: 0.8, react: 0.3 } } };
+  function applySpecial(o, sp, dist = 0, markSide = 0) {   // 特殊スローの分を、投げる条件 o に足す
+    if (sp === 'air') { o.nose = (o.nose || 0) + SPX.airNose; o.hyzer = (o.hyzer || 0) - 6; o.drop = Math.max(o.drop || 0, SPX.airDrop); }
+    else if (sp === 'sharp') { o.hyzer = (o.hyzer || 0) + SPX.sharpHyzer; o.speed *= SPX.sharpSpeed; o.spinRatio = 0.8; }
+    else if (sp === 'big') { o.nose = (o.nose || 0) + SPX.bigNose; o.sCurve = { t0: 0, rate: 0, max: 0, kappa: SPX.bigArc * DEG / Math.max(8, dist || o.speed * 1.2), turnMax: SPX.bigArc * 1.4, fs: markSide || 0 }; o.yaw -= (markSide || -fadeSideOf(o.type, o.hand)) * SPX.bigArc * DEG / 2; }
+    else if (sp === 'bad') o.bad = true;
+    if (sp && sp !== 'bad') o.sp = sp;
+    return o;
+  }
+  const spAccF = (pl) => clamp(0.6 + ((pl && pl.r && pl.r.st && pl.r.st.acc) || 50) / 125, 0.6, 1.4);   // 投げた人の正確さで、効き目の大きさを変える
+  const curThrow = () => throwOf(G.holder, G.pivot, G.hand);
+  const markSideOf = (foot, bearing) => { const mk5 = G.holder && G.holder.def; return mk5 ? Math.sign((mk5.p[0] - foot[0]) * Math.cos(bearing) - (mk5.p[1] - foot[1]) * Math.sin(bearing)) : 0; };   // マークは投げる向きの右(+1)か左(-1)か
+  const currentType = () => curThrow().type;   // 持っている選手の特殊スロー込み
+  const PIVOT_LABEL = { L: '左へ踏む', B: '後ろへ踏む・高く', R: '右へ踏む', LT: '左へ踏む・高く', RT: '右へ踏む・高く', LM: '左へ踏む', RM: '右へ踏む', LD: '左へ踏む・低く', RD: '右へ踏む・低く', C: '後ろへ踏む' };
   const PIVOT_KEY = { L: 'A', B: 'S', R: 'D' };
   const autoNose = (type) => (noWrist(type) ? 0 : 3);
   const wristOf = (type) => (noWrist(type) ? 0 : G.wrist);
@@ -1283,7 +3052,9 @@
     return null;
   }
   function aimPass(tgtFn, speedFn, high = false, iters = 4) {
-    const foot = pivotFoot(), type = currentType();
+    const foot = pivotFoot(), th = curThrow(), type = th.type;
+    if (th.sp === 'big') iters = Math.max(iters, 8);   // ビッグカーブは弧が大きいので、向きの直しを多めに
+    if (type === 'heli') high = true;   // ヘリコプターは高く上げる
     let tFlight = 0.9, yawAdj = 0, best = null;
     for (let it = 0; it < iters; it++) {
       const tg = tgtFn(tFlight);
@@ -1291,9 +3062,11 @@
       const D = Math.hypot(dx, dy), bearing = Math.atan2(dx, dy);
       const o = { foot, yaw: bearing + yawAdj, launch: 0, speed: speedFn(D, type), nose: autoNose(type), hyzer: 0,
         type, hand: G.hand, wristBias: wristOf(type), drop: G.pivZ === G.pivot ? eyeDrop() : 0 };
+      applySpecial(o, th.sp, D, markSideOf(foot, bearing));   // 特殊スロー（曲がりは、下の向きの直しで合わせる）
       const solve = high ? solveLaunchHigh : solveLaunch;   // high: 高く上げて落とす弧
       let L = solve(o, D, bearing);
-      while (L === null && o.speed < SPEED_MAX) { o.speed = Math.min(SPEED_MAX, o.speed + 4); L = solve(o, D, bearing); }
+      const maxSp = SPEED_MAX * G.holder.k.pow;   // パワー
+      while (L === null && o.speed < maxSp) { o.speed = Math.min(maxSp, o.speed + 3); L = solve(o, D, bearing); }   // 3ずつ（試合と同じ）
       if (L === null) return null;
       o.launch = L;
       const r = passAt(o, D, bearing);
@@ -1318,10 +3091,16 @@
 
   // ---------------- 投げる ----------------
   function launch(o, intended, kind) {
+    if (o.bad) { o.hyzer = (o.hyzer || 0) + (Math.random() < 0.5 ? -1 : 1) * (15 + Math.random() * 10); o.yaw += randn() * 1.5 * DEG; }   // 持っていない上の段: 曲がってうまく投げられない
     G.disc = P.makeThrow(o);
+    G.disc.type = o.type;
+    G.throws++; G.disc.from = o.foot.slice();   // 成績: 投げた数・どこから投げたか
+    G.sky = null; G.skyCam = false; G.layout = null; G.layCam = false;
+    if (o.sp) { G.disc.sp = o.sp; G.disc.spF = spAccF(G.holder); }   // 特殊スロー: 効き目の大きさ（投げた人の正確さ）
     SND.play('throw', clamp(o.speed / 30, 0.2, 1));   // 音: 投げる
     G.disc.kind = kind;
     G.thrower = G.holder;
+    ev3d(G.thrower, { name: 'throw', type: o.type, yaw: o.yaw });   // 3D: 投げる動き
     G.markSetAtThrow = hyp(G.holder.def.p, markSpot()) < 0.8;
     G.throwEye = [o.foot[0], o.foot[1], EYE_H - eyeDrop()];
     G.intended = intended || null;
@@ -1336,14 +3115,16 @@
     const r = aimPass((t) => predictPos(m, t), quickSpeed);
     if (!r) { flash(`#${m.n} は遠すぎて届かない`); return; }
     m.tgt = r.point.slice(); m.mode = 'receive';
+    r.o.yaw += randn() * G.holder.k.errDeg * DEG;   // 持っている選手の投げの正確さで、少しずれる
     launch(r.o, m, 'おまかせ');
   }
   // スルーパス: 味方 m をスペース spot へ走らせ、着く頃にそこへ届くパスを出す
+  // ふわっと（山なり）のスルーパスの形（試合の FLOAT と同じ。2026-11-21）: min・max 一番高い所の範囲 [m] / late 受け手が着いてから届くまで [秒] / t0・per 届くまでの時間の目安＝t0＋距離÷per [秒]
+  const FLOAT = { min: 2.2, max: 5.0, late: 0.2, t0: 1.0, per: 22 };
   function throughPass(m, spot, high = true) {   // high: ふわっと（山なり）／false: 鋭く（速く低く）
     spot = [clamp(spot[0], 1, FIELD.W - 1), clamp(spot[1], 1, FIELD.L - 1)];
-    const runT = hyp(m.p, spot) / O_SPRINT + 0.25;
+    const runT = hyp(m.p, spot) / (O_SPRINT * m.k.spd) + 0.25;
     const D = hyp(G.holder.p, spot);
-    // 候補をざっと集める（強さ × 低い弧／高い弧）。ふわっとなら最高点 3.5〜8.5m の弧だけに絞る
     const cands = [];
     PASS_DT = 1 / 20;
     const collect = (hi) => {
@@ -1352,22 +3133,31 @@
         if (r) { r.sp = sp; r.hi = hi; cands.push(r); }
       }
     };
-    if (high) { collect(true); if (!cands.some((c) => c.apex >= 3.5 && c.apex <= 8.5)) collect(false); }
-    else collect(false);
+    if (high) {
+      collect(true); collect(false);
+      // 山なりの弧は「届くいちばん弱い強さ」のときだけ出る。3ずつだと飛ばすので、そのすぐ下（1つ・2つ下）も試す
+      const s0 = cands.reduce((a2, c) => Math.min(a2, c.o.speed), 99);
+      for (const sp of [s0 - 1, s0 - 2]) for (const hi of [false, true]) {
+        const r = aimPass(() => spot, () => sp, hi, 2);
+        if (r && r.o.speed === sp) { r.sp = sp; r.hi = hi; cands.push(r); }
+      }
+    } else collect(false);
     PASS_DT = 1 / 40;
-    const floaty = cands.filter((c) => c.apex >= 3.5 && c.apex <= 8.5);
-    const pool = high && floaty.length ? floaty : cands;
-    // 受け手が着くより少し遅く届く投げを選ぶ（ふわっとは、ゆっくり落ちてくるよう少し長めに）
-    const want = high ? Math.max(runT + 0.3, 1.2 + D / 18) : runT;
+    const floaty = cands.filter((c) => c.apex >= FLOAT.min && c.apex <= FLOAT.max);
+    const lows = cands.filter((c) => c.apex < FLOAT.min), topLow = lows.reduce((a2, c) => Math.max(a2, c.apex), 0);
+    const pool = !high ? cands : floaty.length ? floaty : lows.length ? lows.filter((c) => c.apex >= topLow - 0.25) : cands;
+    const want = high ? Math.max(runT + FLOAT.late, FLOAT.t0 + D / FLOAT.per) : Math.max(0.45, runT - 0.25);
     let best = null;
     for (const c of pool) {
-      const score = Math.abs(c.t - want) + (c.t < runT - 0.3 ? 1 : 0);
+      if (!high && c.apex > 3.0 && pool.some((q) => q.apex <= 3.0)) continue;
+      const score = Math.abs(c.t - want) + (c.t < runT - (high ? 0.3 : 0.5) ? 1 : 0) - (high ? 0 : c.sp * 0.06);
       if (!best || score < best.score) best = Object.assign(c, { score });
     }
-    if (best) { const fin = aimPass(() => spot, () => best.sp, best.hi, 4); if (fin) best = Object.assign(fin, { apex: best.apex }); }
+    if (best) { const fin = aimPass(() => spot, () => best.o.speed, best.hi, 4); if (fin) best = Object.assign(fin, { apex: best.apex }); }
     if (!best) { flash('そこまでは届かない'); return; }
     m.tgt = spot; m.mode = 'receive';
     G.throughSpot = spot;
+    best.o.yaw += randn() * G.holder.k.errDeg * DEG;   // 投げの正確さ
     launch(best.o, m, 'スルーパス');
     flash(`スルーパス（${high ? 'ふわっと' : '鋭く'}）→ #${m.n}`);
   }
@@ -1382,6 +3172,7 @@
   function manualThrow(speed, yawOff = 0) {
     const o = { foot: pivotFoot(), yaw: G.yaw + yawOff, launch: G.pitch / DEG, speed, nose: effectiveNose(), hyzer: G.hyzer,
       type: currentType(), hand: G.hand, wristBias: wristOf(currentType()), drop: eyeDrop() };
+    applySpecial(o, curThrow().sp, aimTarget() || speed * 1.2, markSideOf(o.foot, o.yaw));   // 特殊スロー
     if (G.assistAim) { const dist = aimTarget(); if (dist) { const L = solveLaunch(o, dist); if (L !== null) o.launch = L; } }
     launch(o, null, '自分で');
   }
@@ -1412,11 +3203,13 @@
     manualThrow(SPEED_MIN + (SPEED_MAX - SPEED_MIN) * pw, yawOff);
   }
   function setPivot(pv) {
-    SND.play('tick');   // 音: 区間の切り替え
     const before = currentType();
     G.pivot = pv;
     if (noWrist(before) !== noWrist(currentType())) G.hyzer = 0;
-    flash(`${PIVOT_LABEL[pv]} → ${P.THROW_TYPES[currentType()].label}`, 1.0);
+    const th = curThrow();
+    SND.play(th.sp && th.sp !== 'bad' ? 'chime' : 'tick');   // 音: 区間の切り替え（特殊スローはキラーン）
+    if (th.sp && th.sp !== 'bad') flash(`★${SP_NAME[th.sp]}`, 1.4);   // 特殊スローを選んだ瞬間
+    else flash(`${PIVOT_LABEL[pv]} → ${P.THROW_TYPES[currentType()].label}`, 1.0);
   }
 
   // ピボットのスライド: 指の位置（pivTgt）へ足（pivA）が少し遅れてついてくる。投げ方の区間が変わったら切り替え
@@ -1426,13 +3219,18 @@
     if (!IS_TOUCH) { const kx = (G.keys.KeyD ? 1 : 0) - (G.keys.KeyA ? 1 : 0); if (kx) G.pivTgt = clamp(G.pivTgt + kx * 1.4 * dt, -1, 1); const ky = (G.keys.KeyW ? 1 : 0) - (G.keys.KeyS ? 1 : 0); if (ky) G.pivTgtB = clamp((G.pivTgtB ?? 0.5) + ky * 1.2 * dt, 0, 1); }
     G.pivA = PIV.follow(G.pivA, G.pivTgt, dt);
     G.pivB = PIV.follow(G.pivB ?? 0.5, G.pivTgtB ?? 0.5, dt);
-    const z = PIV.zone(G.pivA, G.pivB, G.pivot);
+    const z = PIV.zone(G.pivA, G.pivB, G.pivot, padSk());   // 持っている選手の特殊な区間
     if (z !== G.pivot) setPivot(z);
     G.pivZ = G.pivot;
   }
   const eyeDrop = () => PIV.drop(G.pivB ?? 0.5);   // パッドの下へ動かすほど目の高さが下がる（姿勢が低くなる）
-  const pivLab = (pv) => P.THROW_TYPES[typeOfPivot(pv, G.hand)].label;
-  const pivState = (caption) => ({ a: G.pivA || 0, b: G.pivB ?? 0.5, tgt: G.pivTgt || 0, tgtB: G.pivTgtB ?? 0.5, zone: G.pivot, caption,
+  const padSk = () => {   // パッドに出す特殊な区間（名前）。スクーバ・ハイフォアを持っていない側の上の段は区切らない（merge）
+    const c = spCodes(G.holder, G.hand), o = {}; for (const k in c) o[k] = SP_NAME[c[k]];
+    o.merge = ['LT', 'RT'].filter((k) => !c[k]);
+    return o;
+  };
+  const pivLab = (pv) => { const t = throwOf(G.holder, pv, G.hand), lb = P.THROW_TYPES[t.type].label; return t.sp === 'bad' ? lb.replace('ハンド', '') : lb; };
+  const pivState = (caption) => ({ a: G.pivA || 0, b: G.pivB ?? 0.5, tgt: G.pivTgt || 0, tgtB: G.pivTgtB ?? 0.5, zone: G.pivot, caption, special: padSk(),
     labels: { L: pivLab('L'), R: pivLab('R'), LT: pivLab('LT'), B: pivLab('B'), RT: pivLab('RT') } });
   function flash(m, t = 1.8) { G.msg = m; G.msgT = t; }
   // スルーパスの引っぱり: 離す直前0.12秒の指（PCはマウス）の速さ [px/秒]。
@@ -1465,7 +3263,7 @@
     O[1].p = [13.5, FIELD.EZ - 2];
     for (let k = 2; k < 7; k++) O[k].p = [18.5 + rnd(-0.5, 0.5), FIELD.EZ + 12 + (k - 2) * 3];
     O.forEach((o) => { o.v = [0, 0]; o.tgt = null; o.chase = null; o.mode = 'stack'; o.armsUp = 0; o.hist = []; });
-    D.forEach((d) => { d.p = [d.mark.p[0] + 0.5, d.mark.p[1] + 1.5]; d.v = [0, 0]; d.chase = null; d.armsUp = 0; });
+    D.forEach((d, i) => { d.p = G.noDef ? [-30, 10 + i * 3] : [d.mark.p[0] + 0.5, d.mark.p[1] + 1.5]; d.v = [0, 0]; d.chase = null; d.armsUp = 0; });   // 守りなし: 赤はフィールドの外
     G.holder = h; G.disc = null; G.thrower = null; G.intended = null; G.throughSpot = null;
     G.phase = 'hold'; G.stall = 0; G.cutT = 1.0;
     G.yaw = 0; G.pitch = -2 * DEG; G.hyzer = 0;
@@ -1525,23 +3323,26 @@
     G.turnovers++;
     G.phase = 'dead'; G.deadT = 2.4;
     bigMsg('ターンオーバー', 2.4);
-    flash(reason + '（守備パートはまだ無いので、自陣からやり直し）', 2.4);
+    flash(reason + '（練習なので、自陣からやり直し）', 2.4);
   }
   function goal(pl) {
     G.score++;
+    ev3d(pl, 'celebrate');   // 3D: 喜ぶ
     SND.play('cheer', 1.4); SND.play('fanfare');   // 音: 得点
     G.phase = G.score >= WIN_SCORE ? 'over' : 'dead';
     G.deadT = 2.6;
     bigMsg(G.score >= WIN_SCORE ? '勝ち！' : '得点！', 3);
     flash(`#${pl.n} がエンドゾーンでキャッチ（パス ${G.passes} 本）`, 2.6);
-    if (G.phase === 'over') flash(`5点取りました。ターンオーバー ${G.turnovers} 回。画面をタップ／クリックでもう一度`, 99);
+    if (G.phase === 'over') { flash('', 0); setTimeout(showResult, 1600); }   // 結果の画面
   }
   function caught(pl) {
     const p = pl.p;
+    ev3d(pl, { name: G.disc && G.disc.p[2] > 2.0 ? 'jump_catch' : 'catch', yaw: G.disc ? Math.atan2(-G.disc.v[0], -G.disc.v[1]) : null });   // 3D: 捕る動き
     SND.play('catch');   // 音: キャッチ
     const TOE = 0.3;   // 片足のつま先でもフィールドに残っていればフィールド内
     if (p[0] < -TOE || p[0] > FIELD.W + TOE || p[1] < -TOE || p[1] > FIELD.L + TOE) { turnover(`#${pl.n} が場外でキャッチ`); return; }
     G.passes++;
+    if (G.disc && G.disc.from) G.longest = Math.max(G.longest, hyp(G.disc.from, pl.p));   // 成績: いちばん長いパス
     if (p[1] >= FIELD.L - FIELD.EZ) { goal(pl); return; }
     // 視点が飛ぶ: 今の目 → 受け手の目
     const yaw2 = Math.atan2(18.5 - p[0], (FIELD.L - FIELD.EZ / 2) - p[1]) * 0.6;   // 攻める方向へ向き直る（真正面寄り）
@@ -1628,6 +3429,7 @@
     }
     for (const o of O) {
       if (o === h && G.phase !== 'flight') { o.v = [0, 0]; continue; }
+      if (o.down > 0 || (G.layout && G.layout.dive && !G.layout.done && o === G.layout.pl)) { o.v = [0, 0]; continue; }   // 飛びついている・倒れている
       let tgt = null, vmax = O_JOG;
       if (o.chase) { tgt = o.chase; vmax = O_SPRINT; }
       else if (o.mode === 'receive' && o.tgt) { tgt = o.tgt; vmax = O_SPRINT; }
@@ -1645,7 +3447,7 @@
         if (o.timer <= 0 || hyp(o.p, o.tgt) < 1) { o.mode = 'stack'; o.tgt = null; o.cutTgt = null; reorderStack(o); }
       } else if (o.mode === 'reset') { tgt = resetSpot(h); vmax = G.stall > 4 ? O_SPRINT : O_JOG; }
       else tgt = stackSpot(o.slot);
-      steer(o, tgt, vmax, O_ACC, dt);
+      steer(o, tgt, vmax * o.k.spd, O_ACC * o.k.acc, dt);   // 速さ・切り返し
     }
   }
   // ディスクを離す位置が、持っている人の体から横（フィールドの x）にどれだけずれているか（自分＝青が持っているとき）
@@ -1684,16 +3486,17 @@
     return h[0].p;
   }
   function updateDefense(dt) {
+    if (G.noDef) { D.forEach((d) => { d.v = [0, 0]; d.chase = null; }); return; }   // 守りなし
     for (const d of D) {
       let tgt, vmax = T.D_SPEED;
       const isMarker = d.mark === G.holder && G.phase !== 'flight';
       if (d.chase) tgt = d.chase;
       else if (isMarker) tgt = markSpot();
       else {
-        const m = pastPos(d.mark, T.D_LAG);
+        const m = pastPos(d.mark, T.D_LAG * d.k.lag);   // 賢いほど遅れが少ない
         tgt = [m[0] + openSide() * T.SHADE_X, m[1] + T.SHADE_Y];   // 奥側・フォア側を少しふさぐ
       }
-      steer(d, tgt, vmax, T.D_ACC, dt);
+      steer(d, tgt, vmax * d.k.spd, T.D_ACC * d.k.acc, dt);   // 速さ・切り返し
     }
   }
   // 飛んでいるディスクの先回り: 誰が、どこで捕れそうか
@@ -1710,9 +3513,145 @@
   }
   function earliestReach(pl, pts, speed, reach, react) {
     for (const q of pts) {
-      if (Math.max(0, hyp(pl.p, q.p) - reach) / speed + react <= q.t) return q;
+      if (Math.max(0, hyp(pl.p, q.p) - reach - pl.k.reach) / (speed * pl.k.spd) + Math.max(0, react + pl.k.react) <= q.t) return q;   // 能力（キャッチ・速さ・反応）
     }
     return null;
+  }
+  // ===== カメラが目へ飛ぶ（試合の flyCamera と同じ。2026-11-21） =====
+  function flyCamera(dur, toFn, arc, after) { G.camT = { t: 0, dur, e0: cam.e.slice(), yaw0: camYaw(), pitch0: camPitch(), toFn, arc, after }; }
+  // ===== スカイ（高いパスの空中戦。試合と同じ）=====
+  const SKY_TAP = { perfect: 0.07, good: 0.18 };                 // タイミングのずれ [秒]
+  const SKY_REACH = { perfect: 3.0, good: 2.6, miss: 2.2 };      // 届く高さ [m]
+  const SKY_CP_SD = { normal: 0.16, strong: 0.11, max: 0.07 };   // 赤のタイミングのばらつき [秒]
+  const SKY_WORD = { perfect: 'ぴったり', good: 'おしい', miss: 'ずれた' };
+  const skyGrade = (err) => (err === null ? 'miss' : Math.abs(err) <= SKY_TAP.perfect ? 'perfect' : Math.abs(err) <= SKY_TAP.good ? 'good' : 'miss');
+  function skyStart(d) {
+    if ((G.layout && !G.layout.done) || d.skyChecked || (d.maxZ || 0) < 3.5 || d.v[2] >= 0 || d.p[2] < 3.0) return;
+    const c = { p: d.p.slice(), v: d.v.slice(), n: d.n.slice(), w: d.w, t: 0, phase: 'flight', maxZ: d.maxZ, spinAngle: 0, alpha: 0, start: d.start, dir: d.dir, right: d.right, sc: d.sc && Object.assign({}, d.sc, { t0: d.sc.t0 - d.t }) };
+    let t = 0;
+    while (c.phase === 'flight' && c.p[2] > 3.0 && t < 1.2) { P.step(c, 1 / 60); t += 1 / 60; }
+    if (t > 0.9 || t < 0.3) return;
+    const q = [c.p[0], c.p[1]];
+    const near = (list) => list.filter((pl) => pl !== G.thrower && !(pl.down > 0)).map((pl) => ({ pl, dd: hyp(pl.p, q) })).sort((a2, b) => a2.dd - b.dd)[0];
+    const o = near(O), x = near(D);
+    const lim = (q2) => 3.5 + (hasT(q2.pl, 'sky') && q2.pl.team === 1 ? 1.5 : 0);   // 空中戦好き（赤）: 少し遠くからでも競りに行く
+    if (!o || !x || o.dd > lim(o) || x.dd > lim(x)) return;
+    d.skyChecked = true;
+    G.sky = { o: o.pl, x: x.pl, blue: o.pl, red: x.pl, q, t0: G.time, tHit: G.time + t, tap: null, redErr: randn() * (SKY_CP_SD[G.cpLevel] || 0.11), done: false };
+    G.skyCam = true; flyCamera(0.3, skyPose, false, null);   // 競る青の選手の目へ
+  }
+  const SKY_JUMP = { perfect: 0.8, good: 0.5, miss: 0.25 };   // 跳んだときに目線が上がる高さ [m]
+  function skyPose() {
+    const s = G.sky, pl = s ? s.blue : G.holder;
+    let z = EYE_H;
+    if (s && s.tap !== null) { const k = (G.time - s.tap) / 0.55; if (k > 0 && k < 1) z += SKY_JUMP[skyGrade(s.tap - s.tHit)] * Math.sin(Math.PI * k); }
+    const e = [pl.p[0], pl.p[1], z], tg = G.disc ? G.disc.p : [pl.p[0], pl.p[1] + 5, 2], dv = V.sub(tg, e);
+    return { e, yaw: Math.atan2(dv[0], dv[1]), pitch: clamp(Math.atan2(dv[2], Math.hypot(dv[0], dv[1])), -0.6, 0.75) };
+  }
+  function skyTick(d) {
+    if (!G.sky) { skyStart(d); return; }
+    const s = G.sky;
+    if (s.done) return;
+    s.o.chase = s.q; s.x.chase = s.q;
+    if (G.time < s.tHit + 0.15 && d.p[2] > 2.3) return;
+    s.done = true; s.doneAt = G.time;
+    const gb = skyGrade(s.tap === null ? null : s.tap - s.tHit), gr = skyGrade(s.redErr);
+    const reach = (pl) => (hyp(pl.p, d.p) < 1.6 ? SKY_REACH[pl === s.blue ? gb : gr] + pl.k.h + pl.k.jumpEx : 0);   // 背の高さと、ジャンプの高さの分だけ高く届く
+    const ro = reach(s.o), rx = reach(s.x);
+    if (!ro && !rx) return;
+    d.contested = true;
+    const win = Math.abs(rx - ro) < 0.05 ? (stOf(s.x, 'pow') > stOf(s.o, 'pow') ? s.x : s.o) : rx > ro ? s.x : s.o, lose = win === s.o ? s.x : s.o, gw = win === s.blue ? gb : gr;
+    lose.armsUp = 0.6; win.armsUp = 0.6;
+    const how = s.tap === null ? '跳ばなかった' : SKY_WORD[gb] + (gb === 'perfect' ? '' : s.tap < s.tHit ? '・早い' : '・遅い');
+    if (win === s.blue) { caught(win); SND.play('cheer', 1); if (G.holder === win) { G.skyWin++; bigMsg(gw === 'perfect' ? 'SKY!' : '空中戦に勝った', 1.8); flash(`#${win.n} が空中戦に勝った（ジャンプ: ${how}）`, 2.4); } }
+    else turnover(`相手 #${win.n} に空中戦で負けた（ジャンプ: ${how}）`);
+  }
+  // ===== ダイビングキャッチ（試合と同じ）=====
+  const LAY_TAP = { perfect: 0.08, good: 0.2 }, LAY_DIST = { perfect: 2.2, good: 1.4, miss: 0.6 }, LAY_DUR = 0.35;
+  const layGrade = (err) => (Math.abs(err) <= LAY_TAP.perfect ? 'perfect' : Math.abs(err) <= LAY_TAP.good ? 'good' : 'miss');
+  function layoutCheck(recv, pts) {
+    if (G.layout || !recv || recv.team !== 0 || !G.thrower || (G.sky && !G.sky.done) || recv.down > 0) return;
+    const v0 = Math.hypot(recv.v[0], recv.v[1]), spd = O_SPRINT * recv.k.spd, accLoss = Math.max(0, spd - v0) ** 2 / (2 * O_ACC * recv.k.acc);
+    let q = null, best = Infinity;
+    for (const c of pts) {
+      const gap = hyp(recv.p, c.p) - Math.max(0, spd * (c.t - O_REACT) - accLoss) - O_REACH - recv.k.reach;
+      if (gap <= 0 && c.t > 0.12) return;   // 道筋のどこかで、走って届く → 出番なし
+      if (c.z >= 1.6 || c.t < 0.7 || c.t > 3) continue;
+      if (gap < best) { best = gap; q = c; }
+    }
+    if (!q || best > LAY_DIST.perfect + 1.0) return;
+    G.layout = { pl: recv, q: q.p.slice(), t0: G.time, tHit: G.time + q.t, tDive: G.time + q.t - LAY_DUR, tap: null, done: false, dive: null };
+    G.layCam = true; flyCamera(0.3, layoutPose, false, null);   // 受け手の目へ
+  }
+  function layoutPose() {
+    const L = G.layout, pl = L ? L.pl : G.holder;
+    let z = EYE_H;
+    if (L && L.dive) z = EYE_H - 1.15 * Math.min(1, L.dive.t / LAY_DUR); else if (pl.down > 0) z = 0.5;
+    const e = [pl.p[0], pl.p[1], z], tg = G.disc ? G.disc.p : [pl.p[0], pl.p[1] + 5, 1], dv = V.sub(tg, e);
+    return { e, yaw: Math.atan2(dv[0], dv[1]), pitch: clamp(Math.atan2(dv[2], Math.hypot(dv[0], dv[1])), -0.6, 0.75) };
+  }
+  function layoutTap() {
+    const L = G.layout;
+    if (!L || L.done || G.phase !== 'flight' || L.tap !== null) return false;
+    L.tap = G.time;
+    const gr = layGrade(L.tap - L.tDive), pl = L.pl, d = G.disc, aim = d ? [d.p[0] + d.v[0] * LAY_DUR, d.p[1] + d.v[1] * LAY_DUR] : L.q;
+    const dx = aim[0] - pl.p[0], dy = aim[1] - pl.p[1], l = Math.hypot(dx, dy) || 1;
+    L.grade = gr;
+    L.dive = { t: 0, from: pl.p.slice(), dir: [dx / l, dy / l], dist: Math.hypot(pl.v[0], pl.v[1]) * LAY_DUR + LAY_DIST[gr] + pl.k.layAdd };   // パワーの分だけ遠くへ
+    pl.chase = null; pl.v = [0, 0]; pl.diveDir = L.dive.dir;
+    ev3d(pl, 'dive'); SND.play('slide');
+    return true;
+  }
+  function layoutTick(dt, d) {
+    const L = G.layout;
+    if (!L || L.done) return;
+    const pl = L.pl;
+    if (!L.dive) { pl.chase = L.q; if (G.time > L.tHit + 0.3) { L.done = true; L.doneAt = G.time; } return; }
+    const dv = L.dive; dv.t += dt;
+    const k = Math.min(1, dv.t / LAY_DUR), ease = 1 - (1 - k) * (1 - k);
+    pl.p = [dv.from[0] + dv.dir[0] * dv.dist * ease, dv.from[1] + dv.dir[1] * dv.dist * ease]; pl.v = [0, 0];
+    const how = L.grade === 'perfect' ? 'ぴったり' : (L.grade === 'good' ? 'おしい' : 'ずれた') + (L.tap < L.tDive ? '・早い' : '・遅い');
+    if (hyp(d.p, pl.p) < 1.0 && d.p[2] > 0.02 && d.p[2] < 1.6) {
+      L.done = true; L.doneAt = G.time; pl.down = 0.9;
+      caught(pl);
+      if (G.holder === pl) { G.layWin++; SND.play('cheer', 0.8); bigMsg('レイアウト！', 1.8); flash(`#${pl.n} がダイビングキャッチ（タイミング: ${how}）`, 2.4); }
+      return;
+    }
+    if (k >= 1) { L.done = true; L.doneAt = G.time; pl.down = 0.9; flash(`ダイビングが届かなかった（タイミング: ${how}）`, 2.2); }
+  }
+  // 命令: 跳ぶ（スカイの最中だけ）。ダイビングキャッチの最中なら飛びつく
+  function skyTap() {
+    if (layoutTap()) return true;
+    const s = G.sky;
+    if (!s || s.done || G.phase !== 'flight' || s.tap !== null) return false;
+    s.tap = G.time; SND.play('jump');
+    return true;
+  }
+  // スカイ・ダイビングの最中は時間をゆっくりにする
+  const skySlow = () => {
+    if (G.blockFx && G.time - G.blockFx.t0 < 0.35) return 0.4;
+    const L = G.layout;
+    if (L) { if (!L.done && G.phase === 'flight' && G.time > L.tDive - 0.45) return 0.45; if (L.done && G.time < L.doneAt + 0.25) return 0.6; }
+    const s = G.sky;
+    if (!s) return 1;
+    if (s.done) return G.time < s.doneAt + 0.2 ? 0.6 : 1;
+    return G.phase === 'flight' && G.time > s.tHit - 0.45 ? 0.45 : 1;
+  };
+  function ringAt(tEnd, t0, color, msg, msgColor) {   // ディスクのまわりの縮む輪（スカイ・ダイビング共通）
+    const d = G.disc, u = UI, c = toCam(d.p);
+    let [x, y] = c[2] > 0.5 ? proj(c) : [W / 2, H * 0.42];
+    x = clamp(x, 160 * u, W - 160 * u); y = clamp(y, 90 * u, H - 150 * u);
+    const k = clamp((tEnd - G.time) / Math.max(0.05, tEnd - t0), 0, 1);
+    ctx.lineWidth = 3 * u; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(x, y, 24 * u, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 5 * u; ctx.beginPath(); ctx.arc(x, y, (24 + 120 * k) * u, 0, Math.PI * 2); ctx.stroke();
+    text(msg, x, y + (52 + 120 * k) * u, 16, msgColor, 'center', true);
+  }
+  function drawSkyLayout() {
+    const d = G.disc;
+    if (!d || G.phase !== 'flight') return;
+    const L = G.layout, s = G.sky;
+    if (L && !L.done && !L.dive) ringAt(L.tDive, L.t0, 'rgba(255,102,153,.95)', IS_TOUCH ? 'ダイビング！ 輪が閉じたらタップ' : 'ダイビング！ 輪が閉じたらスペース／クリック', '#FF6699');
+    else if (s && !s.done) ringAt(s.tHit, s.t0, s.tap !== null ? 'rgba(0,204,153,.95)' : 'rgba(255,230,80,.95)', s.tap !== null ? 'ジャンプ！' : IS_TOUCH ? 'スカイ！ 輪が閉じたらタップ' : 'スカイ！ 輪が閉じたらスペース／クリック', s.tap !== null ? '#00CC99' : '#FFE650');
   }
   function planChases() {
     const fut = clonedFuture();
@@ -1732,11 +3671,13 @@
     if (recv && recv !== thrower) {
       recv.chase = rq ? rq.p : (pts.length ? pts[pts.length - 1].p : fut.land);
       if (G.throughSpot && recv === G.intended && !rq) recv.chase = G.throughSpot;
+      layoutCheck(recv, pts);   // 走っても届かない → 飛びつけば届くか
     }
     const oT = rq ? rq.t : Infinity;
     // 相手: 味方より先に（またはほぼ同時に）届きそうなら取りに行く。受け手の担当は必ず競りに行く
-    for (const d of D) {
-      const q = earliestReach(d, pts, T.D_SPEED, T.D_REACH, T.D_REACT);
+    for (const d of (G.noDef ? [] : D)) {
+      const dsc = G.disc, spE = dsc && dsc.sp && SPX.edge[dsc.sp], spLate = spE ? spE.react * dsc.spF : 0;   // 特殊スローは、守りが追いかけ始めるのが遅れる
+      const q = earliestReach(d, pts, T.D_SPEED, T.D_REACH, T.D_REACT + spLate);
       d.chase = null;
       const margin = d.mark === recv ? T.CHASE_MARGIN : T.CHASE_MARGIN - 0.3;   // 受け手の担当以外は、はっきり先に届くときだけ
       if (q && (q.t <= oT + margin || d.mark === recv)) d.chase = q.p;
@@ -1747,6 +3688,7 @@
   // ---------------- 更新 ----------------
   function update(dt) {
     G.time += dt;
+    if (G.started && G.phase !== 'over') G.playT += dt;   // 成績: かかった時間
     if (G.msgT > 0) G.msgT -= dt;
     if (G.bigT > 0) G.bigT -= dt;
     const k = G.keys, rs = 1.6 * dt;
@@ -1807,15 +3749,17 @@
       if (markSet && !d.blockChecked && d.t < 0.5 && Math.hypot(d.p[0] - mk.p[0], d.p[1] - mk.p[1]) < MARK_ARM && d.p[2] > 0.4 && d.p[2] < 2.8) {
         d.blockChecked = true;   // 腕の範囲を通ったら1回だけ判定（反応が間に合うかは確率）
         mk.armsUp = 0.8;
-        if (Math.random() < T.BLOCK_P * lowReach(d.p[2])) { d.blockMsg = `マーク #${mk.n} にブロックされた`; deflectDisc(d, mk); }   // はじいて、地面に落ちたらターンオーバー
+        const spE = d.sp && SPX.edge[d.sp], spBlock = spE ? Math.max(0.15, 1 - (1 - spE.block) * d.spF) : 1;   // 特殊スローは止められにくい
+        if (Math.random() < T.BLOCK_P * lowReach(d.p[2]) * spBlock) { d.blockMsg = `マーク #${mk.n} にブロックされた`; deflectDisc(d, mk); }   // はじいて、地面に落ちたらターンオーバー
       }
       // キャッチ判定
-      if (G.phase === 'flight' && d.phase === 'flight' && d.t > 0.12 && !d.blocked) {   // はじかれたディスクはだれも捕れない
+      if (d.phase === 'flight' && !d.blocked) { layoutTick(dt, d); if (G.phase === 'flight') skyTick(d); }   // スカイ・ダイビング
+      if (G.phase === 'flight' && d.phase === 'flight' && d.t > 0.12 && !d.blocked && !(G.sky && !G.sky.done)) {   // はじかれたディスクはだれも捕れない
         let who = null, best = Infinity;
         for (const pl of ALL) {
           if (pl === G.thrower) continue;          // 自分のパスは自分で捕れない
           if (pl === G.thrower.def && d.t < 0.5) continue;   // 投げた直後のマークはブロック判定のほうで扱う
-          let reach = pl.team === 0 ? O_REACH : T.D_REACH;
+          let reach = (pl.team === 0 ? O_REACH : T.D_REACH) + pl.k.reach;   // キャッチの能力
           // 投げた人に背中を向けて走っている相手（奥へ走る味方を追いかけている）はディスクが見えないので、届く範囲が狭い
           if (pl.team === 1) {
             const away = [pl.p[0] - G.thrower.p[0], pl.p[1] - G.thrower.p[1]], al = Math.hypot(away[0], away[1]) || 1;
@@ -1824,7 +3768,7 @@
             // オープン（緑）の味方へのパスは、相手が追いつきにくい（画面の緑表示＝ほぼ通る、と一致させる）
             if (G.openAtThrow) reach *= T.OPEN_REACH_K;
           }
-          const zmax = pl.team === 0 ? 2.6 : 2.4;
+          const zmax = (pl.team === 0 ? 2.6 : 2.4) + pl.k.h + pl.k.jumpEx;   // 高さ（背の高さ＋ジャンプの高さ）
           const dd = Math.hypot(d.p[0] - pl.p[0], d.p[1] - pl.p[1]);
           // 同じ瞬間に両方が届くなら、受けに来た味方を優先（相手は0.3m分だけ不利にする）
           const score = dd + (pl.team === 1 ? 0.3 : 0);
@@ -1848,13 +3792,17 @@
       updateDefense(dt);
     }
     if (G.phase === 'dead' && G.disc && G.disc.phase !== 'rest') P.step(G.disc, dt);
-    ALL.forEach((pl) => { if (pl.armsUp > 0) pl.armsUp -= dt; });
+    ALL.forEach((pl) => { if (pl.armsUp > 0) pl.armsUp -= dt; if (pl.down > 0) pl.down -= dt; });
+    if (G.camT) { G.camT.t += dt / G.camT.dur; if (G.camT.t >= 1) { const a2 = G.camT.after; G.camT = null; if (a2) a2(); } }
+    if ((G.skyCam || G.layCam) && G.phase !== 'flight') { G.skyCam = false; G.layCam = false; G.camT = null; }   // 決着がついたら目のカメラをやめる
   }
 
   // ---------------- 入力 ----------------
   const menuBtn = document.getElementById('menuBtn'), menu = document.getElementById('menu');
   const onoff = (b) => (b ? 'オン' : 'オフ');
   const MENU = [
+    { h: '練習の条件' },
+    { label: () => '守りの強さ: ' + DEF_LV[G.defLv].name, act: () => { const o = Object.keys(DEF_LV); setDefLevel(o[(o.indexOf(G.defLv) + 1) % o.length]); resetPoint(); flash('守りの強さ: ' + DEF_LV[G.defLv].name + '（このポイントからやり直し）', 2); } },
     { h: '補助（自分で投げるとき）' },
     { label: () => 'ノーズ角の自動: ' + onoff(G.assistNose), on: () => G.assistNose, act: () => { G.assistNose = !G.assistNose; } },
     { label: () => '照準の補正: ' + onoff(G.assistAim), on: () => G.assistAim, act: () => { G.assistAim = !G.assistAim; } },
@@ -1888,6 +3836,11 @@
     menu.style.display = open ? 'block' : 'none';
     if (open) { renderMenu(); if (document.pointerLockElement) document.exitPointerLock(); }
   });
+  // 始める画面の「守りの強さ」
+  const defBtns = document.querySelectorAll('#defLv button');
+  const paintDef = () => defBtns.forEach((b) => b.classList.toggle('on', b.dataset.v === G.defLv));
+  defBtns.forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); setDefLevel(b.dataset.v); paintDef(); }));
+  paintDef();
   document.getElementById('start').addEventListener('click', () => {
     document.getElementById('overlay').style.display = 'none';
     menuBtn.style.display = 'block';
@@ -1899,9 +3852,35 @@
   const locked = () => document.pointerLockElement === cv;
   function restartIfOver() {
     if (G.phase !== 'over') return false;
-    G.score = 0; G.turnovers = 0; G.passes = 0; G.msgT = 0; resetPoint();
+    if (resultBox.style.display === 'flex') return true;   // 結果の画面のボタンで選ぶ
+    restartDrill();
     return true;
   }
+  function restartDrill() {
+    resultBox.style.display = 'none';
+    Object.assign(G, { score: 0, turnovers: 0, passes: 0, throws: 0, longest: 0, skyWin: 0, layWin: 0, playT: 0, msgT: 0 });
+    resetPoint();
+    if (!IS_TOUCH) lockPointer();
+  }
+  // 結果の画面（5点取ったら）
+  const resultBox = document.getElementById('result');
+  function showResult() {
+    if (G.phase !== 'over') return;
+    if (document.pointerLockElement) document.exitPointerLock();
+    const m = Math.floor(G.playT / 60), sec = Math.round(G.playT % 60), rate = G.throws ? Math.round(G.passes / G.throws * 100) : 0;
+    const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
+    resultBox.querySelector('.body').innerHTML = `<h1>5点取りました！</h1><p class="lv">守りの強さ: ${DEF_LV[G.defLv].name}</p><table>`
+      + row('かかった時間', `${m}分${String(sec).padStart(2, '0')}秒`)
+      + row('パスの成功率', `${rate}%（${G.passes} / ${G.throws} 本）`)
+      + row('1点あたりのパス', (G.passes / Math.max(1, G.score)).toFixed(1) + ' 本')
+      + row('ターンオーバー', G.turnovers + ' 回')
+      + row('いちばん長いパス', G.longest.toFixed(1) + ' m')
+      + row('空中戦の勝ち／ダイビングキャッチ', `${G.skyWin} 回／${G.layWin} 回`)
+      + '</table>';
+    resultBox.style.display = 'flex';
+  }
+  resultBox.querySelector('[data-a=again]').addEventListener('click', (e) => { e.stopPropagation(); restartDrill(); });
+  resultBox.querySelector('[data-a=home]').addEventListener('click', (e) => { e.stopPropagation(); location.href = (/20261117_/.test(decodeURIComponent(location.pathname)) ? '20261117_メニュー_v3.html' : 'index.html'); });
   const canThrow = () => G.phase === 'hold';
 
   // 画面上の位置（CSS px）にいる味方
@@ -1940,6 +3919,7 @@
   const touches = new Map();
   let lastTouchAt = 0;
   cv.addEventListener('pointerdown', (e) => {
+    if (G.started && skyTap()) { e.preventDefault(); return; }   // スカイ・ダイビング: どこをタップ（クリック）しても跳ぶ
     if (e.pointerType === 'mouse' || !G.started) return;
     e.preventDefault();
     lastTouchAt = performance.now();
@@ -1995,6 +3975,7 @@
   // PC
   cv.addEventListener('mousedown', (e) => {
     if (!G.started || performance.now() - lastTouchAt < 1000) return;
+    if ((G.sky && G.sky.tap !== null && !G.sky.done) || (G.layout && G.layout.tap !== null && !G.layout.done)) return;   // いま跳んだクリック
     menu.style.display = 'none';
     if (restartIfOver()) return;
     if (!locked()) { lockPointer(); return; }
@@ -2032,6 +4013,7 @@
   addEventListener('keydown', (e) => {
     G.keys[e.code] = true;
     if (!G.started) return;
+    if (e.code === 'Space' && skyTap()) { e.preventDefault(); return; }   // スカイ・ダイビング: スペースで跳ぶ
     // A・D＝左右、W・S＝高さ。長押しで少しずつ（pivotTick）
     if (e.code === 'KeyR') resetPoint();
   });
@@ -2059,6 +4041,14 @@
       setCam(e, T.yaw0 + dy * s, T.pitch0 + (T.pitch1 - T.pitch0) * s);
       return;
     }
+    if (G.camT && G.phase === 'flight') {
+      const T2 = G.camT, s2 = T2.t * T2.t * (3 - 2 * T2.t), to = T2.toFn();
+      const e = [0, 1, 2].map((i) => T2.e0[i] + (to.e[i] - T2.e0[i]) * s2);
+      let dy = to.yaw - T2.yaw0; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+      setCam(e, T2.yaw0 + dy * s2, T2.pitch0 + (to.pitch - T2.pitch0) * s2); return;
+    }
+    if (G.skyCam && G.sky && G.phase === 'flight') { const p2 = skyPose(); setCam(p2.e, p2.yaw, p2.pitch); return; }   // スカイ: 競る青の目
+    if (G.layCam && G.layout && G.phase === 'flight') { const p2 = layoutPose(); setCam(p2.e, p2.yaw, p2.pitch); return; }   // ダイビング: 受け手の目
     if ((G.phase === 'flight' || G.phase === 'dead') && G.throwEye) { setCam(G.throwEye, G.yaw, G.pitch); return; }
     const pf = pivotFoot();
     setCam([pf[0], pf[1], EYE_H - eyeDrop()], G.yaw, G.pitch);
@@ -2216,6 +4206,7 @@
   // 選手を「立体の骨組み＋計算で動かす人」で描く（humans.js）
   const HR = Humans.create({ ctx, toCam, proj, fogged, NEAR, getFocal: () => focal, getDPR: () => DPR, getTime: () => G.animT || G.time });
   function drawPlayer(pl) {
+    if ((G.layCam && G.layout && pl === G.layout.pl) || (G.skyCam && G.sky && pl === G.sky.blue)) return;   // 目になっている自分
     if (pl === G.holder && G.phase !== 'trans' && G.phase !== 'dead' && G.phase !== 'flight') return;   // 自分は描かない（一人称）
     if (pl === G.thrower && (G.phase === 'flight' || G.phase === 'dead')) return;
     if (pl === G.holder && G.phase === 'trans' && G.trans && G.trans.t > 0.5) return;   // 目に入る直前は描かない
@@ -2232,7 +4223,8 @@
     const isMarker = G.phase === 'hold' && pl === markerOfGame(G.holder);
     const pose = (pl.down > 0 || (G.dive && G.dive.pl === pl)) ? 'down' : pl.armsUp > 0 ? 'armsUp' : isMarker ? 'marker' : 'normal';
     const lookAt = G.disc ? G.disc.p : G.holder.p;
-    HR.draw(pl, { jersey, shorts: pl.team === 0 ? [27, 42, 74] : [50, 28, 28], number: pl.n, pose, lookAt });
+    if (!use3d()) HR.draw(pl, { jersey, shorts: pl.team === 0 ? [27, 42, 74] : [50, 28, 28], number: pl.n, pose, lookAt });   // 3D が読めたら体は 3D
+    ctx.globalAlpha = 1;
     void fogK;
     if (pl.team === 0 && pl !== G.holder) {   // 頭の上の番号札（緑＝オープン）
       const fs = clamp(0.3 * s, 11 * DPR, 20 * DPR);
@@ -2262,11 +4254,26 @@
     fillPoly(ring, 'rgba(0,0,0,.3)');
   }
 
-  function drawScene() {
-    drawWorld();
+  // 3D の選手に渡す情報（試合の frame3d と同じ形）
+  const selfHidden = (pl) => (G.layCam && G.layout && pl === G.layout.pl && (!G.camT || G.camT.t > 0.5)) || (G.skyCam && G.sky && pl === G.sky.blue && (!G.camT || G.camT.t > 0.5)) || (pl === G.holder && G.phase !== 'trans' && G.phase !== 'dead' && G.phase !== 'flight') || (pl === G.thrower && (G.phase === 'flight' || G.phase === 'dead')) || (pl === G.holder && G.phase === 'trans' && G.trans && G.trans.t > 0.5);   // 自分（一人称）は描かない
+  function frame3d(dt) {
+    const players = ALL.map((pl) => {
+      const d = toCam([pl.p[0], pl.p[1], 0])[2], isMarker = G.phase === 'hold' && pl === markerOfGame(G.holder), down = pl.down > 0 || (G.dive && G.dive.pl === pl);
+      return { pl, p: pl.p, visible: !selfHidden(pl) && d > 0.7, alpha: 1, pose: down ? 'down' : isMarker ? 'marker' : 'normal', lookAt: G.disc ? G.disc.p : G.holder.p,
+        faceLook: pl.team === 1 || isMarker, diveDir: down ? pl.diveDir : null, event: EV3D.get(pl) || null, holding: false, hasDisc: pl === G.holder && G.phase !== 'flight' && G.phase !== 'dead',
+        scale: pl.hScale, hand: G.hand };
+    });
+    EV3D.clear();
+    window.R3D.frame({ W, H, dpr: DPR, cam, fov: FOV / DEG, players, dt });
+  }
+  function drawScene(dt) {
     const items = [];
-    for (const t of trees) items.push({ z: toCam(t.p)[2], f: () => drawTree(t) });
-    for (const c of cones) items.push({ z: toCam([c[0], c[1], 0])[2], f: () => drawCone(c) });
+    if (use3d()) { ctx.clearRect(0, 0, W, H); frame3d(dt); }
+    else {
+      drawWorld();
+      for (const t of trees) items.push({ z: toCam(t.p)[2], f: () => drawTree(t) });
+      for (const c of cones) items.push({ z: toCam([c[0], c[1], 0])[2], f: () => drawCone(c) });
+    }
     if (G.windOn) for (const fb of WIND.FLAGS) items.push({ z: toCam([fb[0], fb[1], 0])[2], f: () => WIND.drawFlag(ctx, fb, toCam, proj, NEAR, DPR) });   // 四隅の旗
     for (const pl of ALL) items.push({ z: toCam([pl.p[0], pl.p[1], 0])[2], f: () => drawPlayer(pl) });
     if (G.disc) items.push({ z: toCam(G.disc.p)[2] - 0.01, f: () => { drawShadow(G.disc); drawDisc(G.disc); } });
@@ -2316,6 +4323,7 @@
   }
   function drawHUD() {
     const u = UI;
+    drawSkyLayout();   // スカイ・ダイビングの輪
     if (G.phase === 'hold') DD.drawHeld(currentType(), G.hand, ((G.hyzer - wristOf(currentType())) * fadeSideOf(currentType(), G.hand) + P.THROW_TYPES[currentType()].roll * (G.hand === 'L' ? -1 : 1)));   // 持っているディスク
     DD.drawOffscreen(G.disc);   // 画面の外なら矢印
     if (G.drag && G.drag.mate && canThrow()) {
@@ -2349,13 +4357,13 @@
     // 投げ方
     if (IS_TOUCH) drawTouchHUD();
     else {
-      PIV.draw(ctx, { x: W / (2 * u) - 210, y: H / u - 100, w: 420, h: 90 }, u, pivState('ピボット: A・D＝左右（足の向き）／W・S＝高さ（長押し）'));   // ピボットのスライド
+      if (!(G.skyCam || G.layCam)) PIV.draw(ctx, { x: W / (2 * u) - 210, y: H / u - 100, w: 420, h: 90 }, u, pivState('ピボット: A・D＝左右（足の向き）／W・S＝高さ（長押し）'));   // ピボットのスライド
       if (G.charging && G.chargeT >= QUICK_CLICK) {
         const bw = 260 * u;
         ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(W / 2 - bw / 2, H - 112 * u, bw, 10 * u);
         ctx.fillStyle = '#7889FB'; ctx.fillRect(W / 2 - bw / 2, H - 112 * u, bw * G.power, 10 * u);
       }
-      if (G.started && !locked() && menu.style.display !== 'block' && G.phase !== 'over') text('画面をクリックするとマウスで首を振れます', W / 2, H / 2 + 60 * u, 14, '#fff', 'center', true);
+      if (G.started && !locked() && menu.style.display !== 'block' && G.phase !== 'over' && !(G.skyCam || G.layCam)) text('画面をクリックするとマウスで首を振れます', W / 2, H / 2 + 60 * u, 14, '#fff', 'center', true);
     }
     if (G.bigT > 0) {
       ctx.globalAlpha = Math.min(1, G.bigT * 2);
@@ -2370,7 +4378,7 @@
   }
   function drawTouchHUD() {
     const d = DPR;
-    PIV.draw(ctx, pivBox, d, pivState('ピボット: 左右＝足の向き／上下＝離す高さ'));   // ピボットのスライド
+    if (!(G.skyCam || G.layCam)) PIV.draw(ctx, pivBox, d, pivState('ピボット: 左右＝足の向き／上下＝離す高さ'));   // ピボットのスライド
     const dk = touchUI.disc;
     const can = G.phase === 'hold';
     ctx.fillStyle = G.flick ? 'rgba(120,137,251,.5)' : 'rgba(16,24,44,.45)';
@@ -2400,11 +4408,12 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    update(dt);
+    update(dt * skySlow());   // スカイ・ダイビングの最中はゆっくり
     { const d = G.disc; if (d && G.phase === 'flight') SND.hum(Math.hypot(d.p[0] - cam.e[0], d.p[1] - cam.e[1], d.p[2] - cam.e[2]), Math.hypot(d.v[0], d.v[1], d.v[2])); else SND.hum(null, 0); SND.wind(G.windOn ? WIND.state.now : 0); }   // 音: 飛んでいる間・風
     placeCamera();
-    drawScene();
+    drawScene(dt);
     drawHUD();
+    if (window.R3D && !window.R3D.ready) { ctx.font = `${12 * DPR}px "Meiryo UI", sans-serif`; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(window.R3D.error || `3Dの選手を読み込み中… ${Math.round((window.R3D.progress || 0) * 100)}%`, 12 * DPR, H - 12 * DPR); }
     requestAnimationFrame(frame);
   }
   resetPoint();
@@ -2412,7 +4421,7 @@
 
   // 動作確認用
   function setTouch(on) { IS_TOUCH = on; document.body.classList.toggle('touch', on); resize(); touchUI = layoutTouchUI(); }
-  window.__game = { G, O, D, T, update, quickPass, throughPass, manualThrow, setTouch, hitMate, screenToGround, resetPoint };
+  window.__game = { G, O, D, T, update, quickPass, throughPass, manualThrow, skyTap, aimPass, launch, setTouch, hitMate, screenToGround, resetPoint };
 })();
 
 </script>

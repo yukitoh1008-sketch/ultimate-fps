@@ -44,6 +44,8 @@
   /* 右上: チーム・設定 */
   .top { position: absolute; right: max(18px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); display: flex; gap: 8px; }
   .chip { font: inherit; color: #fff; border: 0; cursor: pointer; padding: 7px 16px; font-size: 12px; transform: skewX(-12deg); background: rgba(8,12,26,.72); border-bottom: 3px solid var(--team); }
+  .drills { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+  .drills .chip { text-decoration: none; display: inline-block; }
   .chip span { display: inline-block; transform: skewX(12deg); } .chip span b { font-family: Osw, Impact, sans-serif; font-weight: normal; letter-spacing: .04em; margin-right: 6px; }
   /* 右下: いまのチーム／クレジット */
   .myteam { margin-top: 1.2vh; font-size: 11px; color: var(--sub); }   /* いまのチーム（ロゴの下） */
@@ -67,6 +69,8 @@
   .seg button span { display: inline-block; transform: skewX(12deg); }
   .seg button.on { background: var(--team); font-weight: bold; }
   .close { position: sticky; bottom: -10px; display: flex; justify-content: flex-end; padding: 10px 0 8px; background: rgba(9,13,28,.96); }
+  .tutbtn { display: block; width: 100%; margin: 4px 0 10px; font: inherit; color: #fff; border: 0; cursor: pointer; padding: 10px 16px; font-size: 14px; text-align: left; transform: skewX(-12deg); background: var(--team); }
+  .tutbtn span { display: inline-block; transform: skewX(12deg); } .tutbtn b { font-family: Osw, Impact, sans-serif; font-weight: normal; letter-spacing: .04em; margin-right: 10px; }
   .close button { font: inherit; color: #fff; border: 0; cursor: pointer; padding: 8px 22px; background: var(--team); transform: skewX(-12deg); font-size: 13px; }
   .close button span { display: inline-block; transform: skewX(12deg); }
 </style>
@@ -82,9 +86,11 @@
   <div class="logo"><div class="l1 osw">ULTIMATE</div><div class="l2 osw"><span>FPS</span></div><div class="sub">パスが通るたび、捕った味方の目へ。</div><div class="myteam">いまのチーム<b id="myTeamName">あなた</b></div></div>
   <nav class="menu">
     <a class="mode main" data-go="match"><b class="osw">PLAY</b><i>試合　7対7・5点先取</i></a>
-    <a class="mode" data-go="game"><b class="osw">ATTACK DRILL</b><i>攻撃パート</i></a>
-    <a class="mode" data-go="practice"><b class="osw">THROWING</b><i>投げ練習</i></a>
   </nav>
+  <div class="drills">   <!-- 練習は右下の端に小さく（2026-11-21） -->
+    <a class="chip" data-go="game"><span><b>ATTACK DRILL</b>攻撃練習</span></a>
+    <a class="chip" data-go="practice"><span><b>THROWING</b>投げ練習</span></a>
+  </div>
   <div class="top">
     <button class="chip" id="openTeam"><span><b>TEAM</b>チーム</span></button>
     <button class="chip" id="openSettings"><span><b>SETTINGS</b>設定</span></button>
@@ -95,6 +101,7 @@
 <section id="settings">
   <div class="panel">
     <div class="hd"><b class="osw">SETTINGS</b><i>設定</i></div>
+    <button class="tutbtn" id="openTut"><span><b>HOW TO PLAY</b>遊び方（ルールと操作のチュートリアル）</span></button>
     <h4><b>MATCH</b>試合の条件</h4>
     <div class="row">CPの強さ<div class="seg" data-key="cp"><button data-v="normal">ふつう</button><button data-v="strong">強い</button><button data-v="max">とても強い</button></div></div>
     <div class="row">風（試合・攻撃パート）<div class="seg" data-key="wind"><button data-v="off">なし</button><button data-v="on">あり</button></div></div>
@@ -122,16 +129,16 @@
  *   2026-11-20 match.js から移した */
 window.UFPS_ROSTER = [
     {   // 青（あなたのチーム）。2026-11-20 オリジナルのキャラに（先発7人はタイトルの絵の7人）
-      7: { name: '一ノ瀬 颯', en: 'ICHINOSE', role: 'C', st: { spd: 80, cut: 82, hgt: 50, ctch: 74, acc: 52, pow: 56, rea: 80, iq: 55, sta: 78 }, look: { hair: 'black', hs: 'c7v3p', skin: 'light', shoes: 'black', acc: 'none', pc: [232, 44, 56] }, traits: ['clutch', 'diver'] },   // 主人公。まっすぐで負けず嫌い
-      11: { name: '白銀 玲', en: 'SHIROGANE', role: 'H', st: { spd: 52, cut: 70, hgt: 50, ctch: 50, acc: 90, pow: 52, rea: 66, iq: 84, sta: 52 }, look: { hair: 'silver', hs: 'c11v5p', skin: 'pale', face: 'c11v5', tip: 'none', shoes: 'black', acc: 'none', pc: [70, 205, 240] }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['faker'] },   // クールで無口
-      3: { name: '春野 千夏', en: 'HARUNO', body: 'f', role: 'H', st: { spd: 52, cut: 60, hgt: 32, ctch: 66, acc: 82, pow: 40, rea: 56, iq: 74, sta: 90 }, look: { hair: 'brown', hs: 'c3', skin: 'light', shoes: 'black', acc: 'none', eye: 'brown', pc: [255, 208, 40] }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['mood'] },   // まとめ役
-      23: { name: '獅堂 剛', en: 'SHIDO', body: 'l', role: 'D', st: { spd: 70, cut: 50, hgt: 74, ctch: 72, acc: 44, pow: 88, rea: 48, iq: 45, sta: 70 }, look: { hair: 'blond', hs: 'm5', skin: 'medium', shoes: 'black', acc: 'none', eye: 'gold', pc: [255, 132, 28] }, sp: { fhT: 'highfore' }, traits: ['sky', 'bold'] },   // 熱血
-      9: { name: '藍沢 凛', en: 'AIZAWA', body: 'f', role: 'C', st: { spd: 72, cut: 90, hgt: 30, ctch: 52, acc: 48, pow: 46, rea: 88, iq: 52, sta: 86 }, look: { hair: 'navy', hs: 'sY', skin: 'fair', shoes: 'black', acc: 'none', eye: 'blue', face: 'Y', pc: [150, 92, 255] }, traits: ['tough'] },   // 切り返しはチーム一
-      14: { name: '桃瀬 ひなた', en: 'MOMOSE', body: 'f', role: 'D', st: { spd: 58, cut: 48, hgt: 72, ctch: 76, acc: 46, pow: 64, rea: 52, iq: 50, sta: 60 }, look: { hair: 'pink', hs: 'c14', skin: 'fair', shoes: 'black', acc: 'none', eye: 'pink', pc: [255, 105, 175] }, sp: { C: 'heli' }, traits: ['streaky', 'sky'] },   // 明るいお調子者
-      17: { name: '雪村 小春', en: 'YUKIMURA', body: 'f', role: 'H', st: { spd: 40, cut: 56, hgt: 30, ctch: 60, acc: 92, pow: 34, rea: 54, iq: 82, sta: 54 }, look: { hair: 'icy', hs: 'sC', skin: 'fair', shoes: 'black', acc: 'none', eye: 'sky', face: 'C', pc: [200, 232, 255] }, traits: ['pressure'] },   // 控え。投げは一番正確・緊張しやすい
-      21: { name: '黒崎 迅', en: 'KUROSAKI', role: 'C', st: { spd: 90, cut: 72, hgt: 48, ctch: 48, acc: 32, pow: 66, rea: 56, iq: 34, sta: 76 }, look: { hair: 'black', hs: 'c21', skin: 'tan', shoes: 'black', acc: 'none', eye: 'red', face: 'Z', pc: [170, 232, 40] }, traits: ['bold'] },   // 控え。チーム一の俊足
-      33: { name: '大河 岳', en: 'OKAWA', body: 'l', role: 'D', st: { spd: 50, cut: 32, hgt: 92, ctch: 66, acc: 48, pow: 76, rea: 44, iq: 58, sta: 60 }, look: { hair: 'black', hs: 'buzz', skin: 'medium', shoes: 'black', acc: 'none', eye: 'brown', face: 'X', pc: [20, 175, 165] }, traits: ['slow'] },   // 控え。一番背が高い
-      5: { name: '翠川 智也', en: 'MIDORIKAWA', role: 'H', st: { spd: 46, cut: 58, hgt: 50, ctch: 56, acc: 88, pow: 50, rea: 54, iq: 92, sta: 50 }, look: { hair: 'green', hs: 'c5', skin: 'light', shoes: 'black', acc: 'glassesV', eye: 'green', face: 'V', pc: [40, 200, 120] }, sp: { bhD: 'air', fhD: 'air', C: 'heli' }, traits: ['careful'] },   // 司令塔
+      7: { name: '一ノ瀬 颯', en: 'ICHINOSE', role: 'C', st: { spd: 80, cut: 82, hgt: 50, ctch: 74, acc: 52, pow: 56, rea: 80, iq: 55, sta: 78 }, look: { hair: 'black', hs: 'c7v3p', skin: 'light', shoes: 'black', acc: 'none', eye: 'charcoal', pc: [232, 44, 56], expr: { BRW_Angry: 0.25 }, body: { leg: 1.06 } }, traits: ['clutch', 'diver'] },   // 主人公。まっすぐで負けず嫌い
+      11: { name: '白銀 玲', en: 'SHIROGANE', role: 'H', st: { spd: 52, cut: 70, hgt: 50, ctch: 50, acc: 90, pow: 52, rea: 66, iq: 84, sta: 52 }, look: { hair: 'silver', hs: 'c11v5p', skin: 'pale', face: 'c11v5', tip: 'none', shoes: 'black', acc: 'sleeve_paint', eye: 'icy', pc: [70, 205, 240], expr: { EYE_Close: 0.2 }, body: { sh: 0.96, arm: 0.93, leg: 0.94 } }, sp: { bhT: 'scoober', bhM: 'sharp' }, traits: ['faker'] },   // クールで無口
+      3: { name: '春野 千夏', en: 'HARUNO', body: 'f', role: 'H', st: { spd: 52, cut: 60, hgt: 32, ctch: 66, acc: 82, pow: 40, rea: 56, iq: 74, sta: 90 }, look: { hair: 'brown', hs: 'c3', skin: 'light', shoes: 'black', acc: 'none', eye: 'brown', pc: [255, 208, 40], expr: { EYE_Joy: 0.25, MTH_Fun: 0.3 }, body: { leg: 0.95 } }, sp: { fhT: 'highfore', fhM: 'big' }, traits: ['mood'] },   // まとめ役
+      23: { name: '獅堂 剛', en: 'SHIDO', body: 'l', role: 'D', st: { spd: 70, cut: 50, hgt: 74, ctch: 72, acc: 44, pow: 88, rea: 48, iq: 45, sta: 70 }, look: { hair: 'blond', hs: 'm5', skin: 'medium', shoes: 'black', acc: 'none', eye: 'gold', pc: [255, 132, 28], expr: { EYE_Joy: 0.4, MTH_Joy: 0.4, BRW_Surprised: 0.2 }, body: { sh: 1.08, arm: 1.12, neck: 1.1 } }, sp: { fhT: 'highfore' }, traits: ['sky', 'bold'], traits9: ['sky'] },   // 熱血
+      9: { name: '藍沢 凛', en: 'AIZAWA', body: 'f', role: 'C', st: { spd: 72, cut: 90, hgt: 30, ctch: 52, acc: 48, pow: 46, rea: 88, iq: 52, sta: 86 }, look: { hair: 'navy', hs: 'sY', skin: 'fair', shoes: 'black', acc: 'wrist_pink', eye: 'blue', face: 'Y', pc: [150, 92, 255], expr: { BRW_Angry: 0.15, MTH_Fun: 0.1 }, body: { arm: 0.92, leg: 0.93 } }, traits: ['tough'] },   // 切り返しはチーム一
+      14: { name: '桃瀬 ひなた', en: 'MOMOSE', body: 'f', role: 'D', st: { spd: 58, cut: 48, hgt: 72, ctch: 76, acc: 46, pow: 64, rea: 52, iq: 50, sta: 60 }, look: { hair: 'pink', hs: 'c14', skin: 'fair', shoes: 'black', acc: 'hairtie_y', eye: 'pink', pc: [255, 105, 175], expr: { EYE_Joy: 0.35, MTH_A: 0.2, MTH_Joy: 0.3 }, body: { sh: 1.05, leg: 1.05 } }, sp: { C: 'heli' }, traits: ['streaky', 'sky'], traits9: ['sky'] },   // 明るいお調子者
+      17: { name: '雪村 小春', en: 'YUKIMURA', body: 'f', role: 'H', st: { spd: 40, cut: 56, hgt: 30, ctch: 60, acc: 92, pow: 34, rea: 54, iq: 82, sta: 54 }, look: { hair: 'icy', hs: 'sC', skin: 'fair', shoes: 'black', acc: 'hairpin', eye: 'sky', face: 'C', pc: [200, 232, 255], expr: { MTH_Small: 0.3, BRW_Sorrow: 0.15 }, body: { arm: 0.93, leg: 0.94, bend: -0.06 } }, traits: ['pressure'], traits9: [] },   // 控え。投げは一番正確・緊張しやすい
+      21: { name: '黒崎 迅', en: 'KUROSAKI', role: 'C', st: { spd: 90, cut: 72, hgt: 48, ctch: 48, acc: 32, pow: 66, rea: 56, iq: 34, sta: 76 }, look: { hair: 'black', hs: 'c21', skin: 'tan', shoes: 'black', acc: 'shades', eye: 'red', face: 'Z', pc: [170, 232, 40], expr: { BRW_Angry: 0.3, MTH_SkinFung_R: 0.3, HA_Fung1: 0.4 }, body: { leg: 0.95, chest: 0.95 } }, traits: ['bold'], traits9: [] },   // 控え。チーム一の俊足
+      33: { name: '大河 岳', en: 'OKAWA', body: 'l', role: 'D', st: { spd: 50, cut: 32, hgt: 92, ctch: 66, acc: 48, pow: 76, rea: 44, iq: 58, sta: 60 }, look: { hair: 'black', hs: 'buzz', skin: 'medium', shoes: 'black', acc: 'wrist_orange+wrist_orange_r', eye: 'brown', face: 'X', pc: [20, 175, 165], expr: { EYE_Joy: 0.45, MTH_Joy: 0.35 }, body: { sh: 1.07, chest: 1.08, neck: 1.1 } }, traits: ['slow'], traits9: ['slow', 'sky'] },   // 控え。一番背が高い
+      5: { name: '翠川 智也', en: 'MIDORIKAWA', role: 'H', st: { spd: 46, cut: 58, hgt: 50, ctch: 56, acc: 88, pow: 50, rea: 54, iq: 92, sta: 50 }, look: { hair: 'green', hs: 'c5', skin: 'light', shoes: 'black', acc: 'glassesV', eye: 'green', face: 'V', pc: [40, 200, 120], expr: { MTH_Fun: 0.15 }, body: { arm: 0.93, leg: 0.95, bend: 0.14 } }, sp: { bhD: 'air', fhD: 'air', C: 'heli' }, traits: ['careful'], traits9: [] },   // 司令塔
     },
     {   // 赤（相手）
       1: { name: 'カエサル', en: 'CAESAR', role: 'H', st: { spd: 52, cut: 66, hgt: 46, ctch: 49, acc: 89, pow: 48, rea: 72, iq: 90, sta: 60 }, look: { hair: 'brown', hs: 'buzz', skin: 'medium', shoes: 'white', acc: 'laurel' }, sp: { fhT: 'highfore', fhM: 'sharp' }, traits: ['clutch'] },
@@ -161,6 +168,19 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
       21: { name: '織田信長', en: 'NOBUNAGA', role: 'C', st: { spd: 80, cut: 70, hgt: 42, ctch: 50, acc: 40, pow: 58, rea: 70, iq: 60, sta: 72 }, look: { hair: 'black', hs: 'topknot', skin: 'light', shoes: 'black', acc: 'whiteband' }, traits: ['bold'] },   // 控え
       33: { name: 'リンカーン', en: 'LINCOLN', role: 'D', st: { spd: 55, cut: 35, hgt: 90, ctch: 66, acc: 50, pow: 60, rea: 45, iq: 72, sta: 62 }, look: { hair: 'black', hs: 'short', skin: 'light', shoes: 'black', acc: 'none' }, traits: ['tough'] },   // 控え
       5: { name: 'ガリレオ', en: 'GALILEO', role: 'D', st: { spd: 49, cut: 26, hgt: 86, ctch: 74, acc: 48, pow: 70, rea: 48, iq: 69, sta: 45 }, look: { hair: 'brown', hs: 'slick', skin: 'light', shoes: 'black', acc: 'glasses' }, sp: { C: 'heli' }, traits: ['slow'] },
+};
+// 個性の名前（試合の画面・選手を見る画面で使う。2026-11-21 match.js から移した）
+window.UFPS_TRAIT = {
+  bold: '強気', careful: '慎重', clutch: '勝負強い', pressure: 'プレッシャーに弱い', streaky: 'お調子者', slow: 'スロースターター',
+  sky: '空中戦好き', diver: '飛び込み屋', tough: '粘り強い', faker: 'フェイク上手', mood: 'ムードメーカー', moody: '気分屋',
+};
+// 見た目の色（3D の選手の髪・目・肌・靴。render3d.js が使う。2026-11-21 match.js から移した）
+window.LOOK_COLOR = {
+  hair: { black: [32, 28, 26], brown: [105, 68, 40], blond: [222, 190, 110], red: [175, 68, 34], white: [228, 228, 222],
+    silver: [196, 200, 210], navy: [40, 52, 110], green: [46, 110, 74], pink: [236, 120, 168], icy: [200, 228, 240] },   // 2026-11-20 主人公チームの髪の色
+  eye: { charcoal: [74, 76, 84], amber: [196, 120, 40], icy: [150, 200, 235], green: [60, 170, 100], blue: [60, 130, 230], sky: [110, 190, 240], red: [190, 40, 50], brown: [120, 70, 40], gold: [215, 165, 40], pink: [230, 100, 160] },   // 黒目の色（2026-11-20）
+  skin: { pale: [242, 194, 162], fair: [242, 210, 186], light: [228, 186, 152], medium: [198, 148, 110], tan: [165, 115, 80], dark: [108, 72, 52] },
+  shoes: { black: [30, 30, 32], brown: [96, 62, 38], white: [236, 236, 236], silver: [178, 180, 190], gold: [205, 165, 60] },
 };
 
 </script>
@@ -449,59 +469,212 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
   css.textContent = `#teamBox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(8,14,30,.6); font-family: "Meiryo UI", sans-serif; color: #fff; }
     #teamBox .pn { width: min(760px, 96vw); max-height: 94vh; overflow: auto; background: rgba(20,30,58,.97); border-radius: 14px; padding: 10px 14px; box-sizing: border-box; }
     #teamBox h3 { margin: 2px 0 6px; font-size: 16px; }
-    #teamBox .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; margin-bottom: 4px; }
+    #teamBox .tbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; margin-bottom: 4px; }
     #teamBox input { font: inherit; font-size: 14px; width: 9.5em; padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; }
     #teamBox .chip { width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,.55); cursor: pointer; padding: 0; }   /* 黒も見えるよう細い白の縁 */
     #teamBox .chip.on { border-color: #FFE650; }
     #teamBox .pv { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 5px; border: 2px solid transparent; border-radius: 8px; background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 10px; cursor: pointer; vertical-align: middle; }
     #teamBox .pv.on { border-color: #FFE650; } #teamBox .pv canvas { display: block; width: 54px !important; height: 42px !important; cursor: pointer; touch-action: auto; }   /* 試合の画面は canvas を全部画面いっぱいにする決まりがあるので、見本の絵は大きさを固定する（2026-11-20 林さん「総合60の画面しか映らない」） */
     #teamBox .note { margin: 2px 0 4px; font-size: 12px; color: #C7CDFD; }
-    #teamBox .cols { display: flex; gap: 12px; } #teamBox .col { flex: 1; } #teamBox h4 { margin: 2px 0; font-size: 13px; color: #C7CDFD; }
-    #teamBox .row { display: flex; align-items: center; gap: 6px; width: 100%; margin: 2px 0; padding: 3px 8px; border: 2px solid transparent; border-radius: 8px; background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 13px; cursor: pointer; text-align: left; box-sizing: border-box; }
-    #teamBox .row.sel { border-color: #FFE650; background: rgba(255,230,80,.18); } #teamBox .row .nm { font-weight: bold; flex: 1; } #teamBox .row .rl { color: #C7CDFD; font-size: 11px; } #teamBox .row .tov { font-size: 11px; color: #FFE650; min-width: 3.5em; text-align: right; }
+    /* 2026-11-21 左にベンチ、右にフィールド */
+    #teamBox .lay { display: flex; gap: 12px; align-items: stretch; } #teamBox h4 { margin: 2px 0 4px; font-size: 13px; color: #C7CDFD; }
+    #teamBox .bench { width: 150px; flex: none; display: flex; flex-direction: column; } #teamBox .bench .list { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 6px; padding: 6px 0; border-radius: 10px; background: rgba(255,255,255,.06); }
+    #teamBox .fwrap { flex: 1; display: flex; flex-direction: column; }
+    #teamBox .field { position: relative; flex: 1; min-height: 300px; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255,255,255,.75);
+      background: linear-gradient(to bottom, rgba(255,255,255,.08) 0 14%, transparent 14%), repeating-linear-gradient(to bottom, #2f8a43 0 10%, #348f48 10% 20%); }
+    #teamBox .field::before { content: ''; position: absolute; left: 0; right: 0; top: 14%; border-top: 2px solid rgba(255,255,255,.75); }   /* エンドゾーンの線 */
+    #teamBox .field .dir { position: absolute; right: 8px; top: 4px; font-size: 11px; color: rgba(255,255,255,.8); }
+    #teamBox .pl { display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; color: #fff; text-align: center; line-height: 1.15; }
+    #teamBox .field .pl { position: absolute; transform: translate(-50%, -50%); }
+    #teamBox .pl .ph { position: relative; width: 54px; height: 54px; border-radius: 50%; transition: transform .12s; }
+    #teamBox .pl .ph img { width: 54px; height: 54px; display: block; border-radius: 50%; }
+    #teamBox .pl.sel .ph { transform: scale(1.12); box-shadow: 0 0 0 3px #FFE650, 0 0 14px 4px rgba(255,230,80,.6); }
+    #teamBox .pl { touch-action: none; } #teamBox .pl .ph img { -webkit-user-drag: none; } #teamBox .pl.drag { opacity: .35; }
+    #teamBox .pl.drop .ph { transform: scale(1.15); box-shadow: 0 0 0 3px #FFE650, 0 0 14px 4px rgba(255,230,80,.6); }   /* ここで離すと入れ替わる */
+    #tmGhost { position: fixed; z-index: 40; pointer-events: none; width: 62px; height: 62px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 6px 18px rgba(0,0,0,.55); }
+    #teamBox .pl b { font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,.8); white-space: nowrap; } #teamBox .pl small { font-size: 10px; color: #E6E9FF; text-shadow: 0 1px 2px rgba(0,0,0,.8); white-space: nowrap; } #teamBox .pl small i { font-style: normal; color: #FFE650; }
+    @media (max-height: 460px) { #teamBox h3, #teamBox .note { display: none; } #teamBox .pv .cv { display: none; } #teamBox .pv { padding: 4px 8px; font-size: 11px; } #teamBox .tbar { margin-bottom: 2px; }
+      #teamBox .field { min-height: 205px; } #teamBox .pl .ph, #teamBox .pl .ph img { width: 40px; height: 40px; } #teamBox .pl b { font-size: 11px; } #teamBox .bench .list { gap: 2px; padding: 2px 0; } #teamBox .btns { padding: 6px 0 8px; } }
+    #pvBox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 30; background: rgba(4,8,20,.72); }
+    #pvBox .fr { position: relative; width: min(960px, 96vw); height: min(600px, 92vh); border-radius: 14px; overflow: hidden; background: #0f1830; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+    #pvBox iframe { width: 100%; height: 100%; border: 0; display: block; }
+    #pvBox .x { position: absolute; top: 8px; left: 8px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(16,24,48,.85); color: #fff; font-size: 20px; cursor: pointer; }
     #teamBox .btns { display: flex; gap: 10px; justify-content: space-between; margin: 6px 0 0; position: sticky; bottom: -10px; padding: 8px 0 10px; background: rgba(20,30,58,.97); }   /* 決定（試合開始）ボタンは、スクロールしなくてもいつも下に見える */
     #teamBox .btns button { font: inherit; font-size: 14px; color: #fff; border: 0; border-radius: 9px; padding: 8px 18px; background: #7889FB; cursor: pointer; } #teamBox .btns button.sub { background: rgba(255,255,255,.18); }`;
-  function mount() { if (!box.isConnected) { document.head.appendChild(css); document.body.appendChild(box); } }
+  function mount() { if (!box.isConnected) { document.head.appendChild(css); document.body.appendChild(box); document.body.appendChild(pv); } }
+  // 選手を見る小窓（2026-11-21）。アイコンをタップで開く
+  const pv = document.createElement('div'); pv.id = 'pvBox';
+  const VIEWER = /\/\d{8}_[^/]*$/.test(decodeURI(location.pathname)) ? '20261121_選手ビュー_v1.html' : 'viewer.html';   // このフォルダの版とスマホ用・公開用で名前が違う
+  function openPlayer(n, st) {
+    const q = new URLSearchParams({ n, color: st.color, design: st.design, name: st.name || '' });
+    pv.innerHTML = `<div class="fr"><iframe src="${VIEWER}?${q}" title="選手を見る"></iframe><button class="x" aria-label="閉じる">✕</button></div>`;
+    pv.style.display = 'flex';
+    const close = (e) => { if (e) e.stopPropagation(); pv.style.display = 'none'; pv.innerHTML = ''; removeEventListener('keydown', esc, true); };   // 閉じたら 3D も止める（小窓ごと消す）
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    pv.querySelector('.x').addEventListener('click', close);
+    pv.addEventListener('click', (e) => { if (e.target === pv) close(e); }, { once: true });
+    addEventListener('keydown', esc, true);
+  }
 
   function open(opt = {}) {
     mount();
     let st = load(), sel = null;
     const all10 = DEF.starters[0].concat(DEF.bench[0]);
-    const row = (n) => `<button class="row${sel === n ? ' sel' : ''}" data-n="${n}" style="${R[0][n].look && R[0][n].look.pc ? `box-shadow: inset 5px 0 0 rgb(${R[0][n].look.pc.join(',')})` : ''}"><span>#${n}</span><span class="nm">${R[0][n].name}</span><span class="rl">${ROLE[R[0][n].role]}</span><span class="tov">総合 ${overall(n)}</span></button>`;
+    // 選手1人（アイコン＋名前＋役割と総合）。pos: フィールドの中の位置 [横%, 縦%]（ベンチは無し）
+    const card = (n, pos) => `<div class="pl${sel === n ? ' sel' : ''}" data-n="${n}"${pos ? ` style="left:${pos[0]}%;top:${pos[1]}%"` : ''}><span class="ph"><img src="assets/ui/icons/icon_${st.color}_${n}.png" alt="" draggable="false"></span><b>#${n} ${R[0][n].name}</b><small>${ROLE[R[0][n].role]} <i>${overall(n)}</i></small></div>`;
+    // フィールドの並べ方: 奥＝ディープ、真ん中＝カッター、手前＝ハンドラー。同じ役割は横に等しく並べる
+    const ROW_Y = { D: 27, C: 55, H: 82 };
+    const fieldCards = () => ['D', 'C', 'H'].map((rl) => { const ns = st.starters.filter((n) => R[0][n].role === rl); return ns.map((n, k) => card(n, [(k + 1) / (ns.length + 1) * 100, ROW_Y[rl]])).join(''); }).join('');
     const draw = () => {
       const bench = all10.filter((n) => !st.starters.includes(n)), cnt = (r) => st.starters.filter((n) => R[0][n].role === r).length;
       const col = COLORS[st.color];
-      box.innerHTML = `<div class="pn"><h3>チーム</h3>`
-        + `<div class="top"><label>チーム名 <input maxlength="10" placeholder="あなた" value="${st.name.replace(/"/g, '&quot;')}"></label>`
+      box.innerHTML = `<div class="pn"><h3>${opt.lineup ? 'スタメン' : 'チーム'}</h3>`
+        + (opt.lineup ? '' : ``   // 試合前（lineup）は、チーム名とユニフォームを出さない（2026-11-21）
+        + `<div class="tbar"><label>チーム名 <input maxlength="10" placeholder="あなた" value="${st.name.replace(/"/g, '&quot;')}"></label>`
         + `<span>色 ${Object.entries(COLORS).map(([k, c]) => `<button class="chip${k === st.color ? ' on' : ''}" data-c="${k}" title="${c.name}" style="background:rgb(${c.top.join(',')})"></button>`).join(' ')} ${col.name}</span></div>`
-        + `<div class="top">柄 ${[['cr_ivory', 'クラシック'], ['prestige', '上品'], ['pins', 'グラデーション'], ['side', 'サイドパネル'], ['topo', '等高線']].map(([k, lb]) => `<button class="pv${k === st.design ? ' on' : ''}" data-d="${k}"><span class="cv"></span>${lb}</button>`).join(' ')}<span style="font-size:11px;color:#C7CDFD">チーム名を英字にすると胸に入る</span></div>`
-        + `<p class="note">名前を1人ずつタップすると、先発と控えが入れ替わる　／　いま ハンドラー${cnt('H')}・カッター${cnt('C')}・ディープ${cnt('D')}</p>`
-        + `<div class="cols"><div class="col"><h4>先発7人</h4>${st.starters.map(row).join('')}</div><div class="col"><h4>控え3人</h4>${bench.map(row).join('')}</div></div>`
+        + `<div class="tbar">柄 ${[['cr_ivory', 'クラシック'], ['prestige', '上品'], ['pins', 'グラデーション'], ['side', 'サイドパネル'], ['topo', '等高線']].map(([k, lb]) => `<button class="pv${k === st.design ? ' on' : ''}" data-d="${k}"><span class="cv"></span>${lb}</button>`).join(' ')}<span style="font-size:11px;color:#C7CDFD">チーム名を英字にすると胸に入る</span></div>`)
+        + `<p class="note">アイコンをドラッグして相手の上で離すと入れ替わる（ベンチ ⇔ フィールド）　／　タップで詳しく見る　／　いま ハンドラー${cnt('H')}・カッター${cnt('C')}・ディープ${cnt('D')}</p>`
+        + `<div class="lay"><div class="bench"><h4>ベンチ（控え3人）</h4><div class="list">${bench.map((n) => card(n)).join('')}</div></div>`
+        + `<div class="fwrap"><h4>フィールド（先発7人）</h4><div class="field"><span class="dir">↑ 攻める向き</span>${fieldCards()}</div></div></div>`
         + `<div class="btns"><button class="sub" data-a="reset">最初の形に戻す</button><button data-a="ok">${opt.ok || '決定'}</button></div></div>`;
       const inp = box.querySelector('input');
-      inp.addEventListener('input', () => { st.name = inp.value.trim(); });
-      inp.addEventListener('keydown', (e) => e.stopPropagation());   // 試合のキー操作に流さない
+      if (inp) { inp.addEventListener('input', () => { st.name = inp.value.trim(); }); inp.addEventListener('keydown', (e) => e.stopPropagation()); }   // 試合のキー操作に流さない
       box.querySelectorAll('.pv').forEach((b) => {   // 柄の見本（ユニフォームの素材が読めていれば）
         const cv = window.Uniform && Uniform.preview(b.dataset.d, st.color, 54); if (cv) b.querySelector('.cv').appendChild(cv);
         b.addEventListener('click', (e) => { e.stopPropagation(); st.design = b.dataset.d; draw(); });
       });
       box.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); st.color = b.dataset.c; draw(); }));
-      box.querySelectorAll('.row').forEach((b) => b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const n = +b.dataset.n;
-        if (sel === null || sel === n) sel = sel === n ? null : n;
-        else if (st.starters.includes(sel) !== st.starters.includes(n)) { const out = st.starters.includes(sel) ? sel : n, inn = out === sel ? n : sel; st.starters[st.starters.indexOf(out)] = inn; sel = null; }
-        else sel = n;
-        draw();
-      }));
-      box.querySelector('[data-a=reset]').addEventListener('click', (e) => { e.stopPropagation(); st = def(); sel = null; draw(); });
+      // 選手: ドラッグ＝入れ替え（ベンチ ⇔ フィールドの選手の上で離す）／動かさずに離す（タップ）＝選手を見る（2026-11-21）
+      box.querySelectorAll('.pl').forEach((b) => {
+        b.addEventListener('click', (e) => e.stopPropagation());
+        b.addEventListener('pointerdown', (e) => {
+          e.stopPropagation(); e.preventDefault();
+          const n = +b.dataset.n, x0 = e.clientX, y0 = e.clientY; let gh = null, over = null;
+          const target = (x, y) => {   // 離したら入れ替わる相手（ベンチの人ならフィールドの人、フィールドの人ならベンチの人）
+            const el = document.elementFromPoint(x, y), p = el && el.closest ? el.closest('#teamBox .pl') : null;
+            return p && +p.dataset.n !== n && st.starters.includes(+p.dataset.n) !== st.starters.includes(n) ? p : null;
+          };
+          const move = (ev) => {
+            if (!gh) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return; gh = b.querySelector('img').cloneNode(); gh.id = 'tmGhost'; document.body.appendChild(gh); b.classList.add('drag'); }
+            gh.style.left = ev.clientX + 'px'; gh.style.top = ev.clientY + 'px';
+            const p = target(ev.clientX, ev.clientY);
+            if (p !== over) { if (over) over.classList.remove('drop'); over = p; if (over) over.classList.add('drop'); }
+          };
+          const up = (ev) => {
+            removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+            if (!gh) { if (ev.type === 'pointerup') openPlayer(n, st); return; }   // 動かさずに離した＝タップ
+            gh.remove(); b.classList.remove('drag');
+            if (over) { const m = +over.dataset.n, out = st.starters.includes(n) ? n : m, inn = out === n ? m : n; st.starters[st.starters.indexOf(out)] = inn; }
+            draw();
+          };
+          addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+        });
+      });
+      box.querySelector('[data-a=reset]').addEventListener('click', (e) => { e.stopPropagation(); if (opt.lineup) st.starters = def().starters; else st = def(); sel = null; draw(); });   // 試合前は先発だけ戻す
       box.querySelector('[data-a=ok]').addEventListener('click', (e) => { e.stopPropagation(); save(st); box.style.display = 'none'; if (opt.onDone) opt.onDone(st); });
     };
     draw();
     box.style.display = 'flex';
     if (window.Uniform && !Uniform.isReady()) Uniform.ready.then(() => { if (box.style.display === 'flex') draw(); });   // 見本はあとから
   }
-  window.TeamUI = { open, load, COLORS, isOpen: () => box.style.display === 'flex' };
+  window.TeamUI = { open, load, COLORS, openPlayer, isOpen: () => box.style.display === 'flex' || pv.style.display === 'flex' };
+})();
+
+</script>
+<script>
+/* ============================================================
+ * チュートリアル（遊び方）（2026-11-21 林さん「ホームの設定にチュートリアルをいれたい」「アルティメット自体のルール説明も加えて」）
+ *   ・説明の画面をめくる形（絵＋短い文）。左の目次から章へ飛べる。← → キー・Esc も使える
+ *   ・操作の説明は、スマホと PC で自動で切り替える（{ touch: '…', pc: '…' }）
+ *   ・絵は assets/ui/tutorial/（tools/make_チュートリアルの絵.py で作る）
+ *   使い方: Tutorial.open()。初めてホームを開いたときは、ホーム（menu3.html）が自動で開く（Tutorial.seen() で確かめる）
+ * ============================================================ */
+(function () {
+  const IS_TOUCH = ('ontouchstart' in window) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
+  const IMG = (k) => `assets/ui/tutorial/${k}.jpg`;
+  // 章とページ。text は文字か { touch, pc }。note は小さな補足（本物との違いなど）
+  const CH = [
+    { name: 'アルティメットのルール', pages: [
+      { img: 'r1_game', title: 'どんな競技？', text: 'ディスク（フリスビー）を使う、7人対7人のチーム競技です。パスをつないで、相手のエンドゾーンまでディスクを運びます。' },
+      { img: 'r2_field', title: 'フィールドと得点', text: '縦100m×横37mのフィールドの両はしに、奥行き18mのエンドゾーンがあります。相手側のエンドゾーンの中でパスを捕ると1点です。', note: 'このゲームの試合は5点先取（本物の大会はふつう15点）' },
+      { img: 'r3_pivot', title: '持ったら走れない', text: 'ディスクを持った人は走れません。片足（軸足）を地面につけたまま、もう片方の足を踏み出して向きを変えます。これを「ピボット」といいます。', note: 'このゲームでは、パッドで踏み出す向きを選ぶと投げ方が変わります（「パスを出す」の章）' },
+      { img: 'r4_stall', title: '10秒以内に投げる', text: '持っている人に付いた相手（マーク）が「ストーリング、1、2、3…」と10まで数えます。10までに投げないと、相手のボールになります。', note: 'このゲームでも、画面の上にストールの数が出て、声でも読み上げます' },
+      { img: 'r5_turnover', title: '攻守交代（ターンオーバー）', text: 'パスが地面に落ちた・場外に出た・相手に取られた（カット・ブロック）・ストール10、のどれかで、その場所から相手チームの攻めになります。' },
+      { img: 'r6_spirit', title: '体をぶつけない・審判がいない', text: '体の接触は反則です。審判はいなくて、選手どうしで話し合って判定します。このフェアプレーの精神を「スピリット・オブ・ザ・ゲーム」といい、アルティメットでいちばん大切にされています。', note: 'このゲームでは体はぶつからず、反則の判定は入れていません' },
+    ] },
+    { name: 'このゲームについて', pages: [
+      { img: 'g_title', title: 'あなたはディスクを持った選手の目になる', text: '試合は一人称です。ディスクを持った味方の目で投げ、パスが通ると、捕った味方の目へ視点が飛びます。ターンオーバーされると、空からの中継カメラになって守ります。7対7・5点先取です。' },
+    ] },
+    { name: 'パスを出す', pages: [
+      { img: 'g_attack', title: 'おまかせパス', text: { touch: '青い味方をタップすると、その味方に届く投げ方を自動で選んで投げます。足元に緑の輪が出ている味方は、相手から離れて空いて（オープン）います。', pc: '画面の真ん中の照準を味方に合わせて、短くクリックすると、その味方に届く投げ方を自動で選んで投げます。足元に緑の輪が出ている味方は空いて（オープン）います。' } },
+      { img: 'g_attack', title: '自分で投げる', text: { touch: '右下のディスクから上へなぞって投げます。なぞった向き＝方向、なぞった長さ＝強さ、指の曲がり＝カーブです。画面の左半分をドラッグすると首を振れます。', pc: '左クリックを長押しして離すと投げます。ためた長さ＝強さ、マウス＝向き、ホイール＝ディスクの傾き（ハイザー角）です。' } },
+      { img: 'g_attack', title: 'ピボットのパッド（投げ方を選ぶ）', text: { touch: '左下のパッドで、左右＝踏み出す足の向き（左右の端＝真横、真ん中＝真後ろ）、上下＝離す高さを選びます。右利きなら、左＝バックハンド、右＝フォアハンド、後ろ＝ハンマー、上の段＝スクーバ・ハイフォアです。', pc: 'A・D で踏み出す足の向き、W・S で離す高さを選びます（長押しで少しずつ）。右利きなら、左＝バックハンド、右＝フォアハンド、後ろ＝ハンマー、上の段＝スクーバ・ハイフォアです。' } },
+      { img: 'g_through', title: 'スルーパス（鋭く・ふわっと）', text: { touch: '味方を、走らせたい所へ指で引っ張ります。引っ張ったまま、もう片方の指で「鋭く」か「ふわっと」を押すと、そこへパスが出ます。鋭く＝速く低い、ふわっと＝山なり。押さずに離すとやめられます。', pc: '味方に照準を合わせて右ボタンで引っ張り、走らせたい所を決めます。右ボタンを押したまま、左クリック＝鋭く／スペース＝ふわっと。押さずに右ボタンを離すとやめられます。' } },
+    ] },
+    { name: '投げ方', pages: [
+      { img: 'g_special', title: '特殊スロー', text: '選手によっては特殊スロー（スクーバ・ハイフォア・エアバウンド・シャープカーブ・ビッグカーブ・ヘリコプター）を持っています。パッドに★の区間が出て、選ぶとキラーンと鳴ります。マークに止められにくく、守りが追いかけ始めるのも遅れます。', note: '持っていない上の段（スクーバ・ハイフォア）で投げると、うまく投げられません' },
+    ] },
+    { name: '空中で競る', pages: [
+      { img: 'g_sky', title: 'スカイ（空中戦）', text: { touch: '高く上がったパスを青と赤が競るとき、時間がゆっくりになり、ディスクに黄色い輪が出ます。輪が閉じた瞬間にタップして跳びます。ぴったりほど高く届きます。', pc: '高く上がったパスを青と赤が競るとき、時間がゆっくりになり、ディスクに黄色い輪が出ます。輪が閉じた瞬間にスペースかクリックで跳びます。ぴったりほど高く届きます。' }, note: '能力「高さ」（背の高さとジャンプの高さ）が高い選手ほど有利' },
+      { img: 'g_dive', title: 'ダイビングキャッチ', text: { touch: '走っても届かないが、飛びつけば届くパスでは、受け手の目になって桃色の輪が出ます。輪が閉じた瞬間にタップすると飛びつきます。', pc: '走っても届かないが、飛びつけば届くパスでは、受け手の目になって桃色の輪が出ます。輪が閉じた瞬間にスペースかクリックで飛びつきます。' }, note: '能力「パワー」が高い選手ほど遠くまで飛べる' },
+    ] },
+    { name: '守る', pages: [
+      { img: 'g_tactics', title: '作戦タイム', text: '相手の攻めが始まる前に、時間が止まった作戦タイム（最大10秒）があります。マンツーマンかゾーンか、フォース（相手に投げさせたい側）を選んで「開始」を押します。' },
+      { img: 'g_defense', title: '守備の操作', text: { touch: '黄色い輪の選手をあなたが動かします。画面の左側をドラッグ＝移動、「切替」＝動かす選手を変える、「飛びつく」＝ディスクへダイブ。ほかの味方は、ドラッグするとそこへ走らせられます。', pc: '黄色い輪の選手をあなたが動かします。WASD・矢印＝移動、Q＝動かす選手を変える、スペース＝ディスクへダイブ。ほかの味方は、マウスでドラッグするとそこへ走らせられます。' } },
+      { img: 'g_block', title: 'ジャンプでハンマーを止める', text: { touch: '相手がマークの頭の上を越すハンマーを投げてくるときは、「ジャンプ」を押してマークを跳ばせます。相手が手を離す少し前に跳ぶのがコツ。早すぎ・遅すぎると止められません。', pc: '相手がマークの頭の上を越すハンマーを投げてくるときは、E キーでマークを跳ばせます。相手が手を離す少し前に跳ぶのがコツ。早すぎ・遅すぎると止められません。' }, note: 'あなたが投げるときも、相手のマークは跳んできます。着地を見てから投げると通ります' },
+    ] },
+    { name: 'チームと練習', pages: [
+      { img: 'g_lineup', title: 'チームとスタメン', text: 'ホームの「チーム」で、チーム名・ユニフォームの色と柄・先発7人を決めます。アイコンをドラッグして、入れ替えたい相手の上で離すと、ベンチとフィールドで入れ替わります。' },
+      { img: 'g_viewer', title: '選手を見る', text: 'アイコンをタップすると、その選手の3Dの全身と能力が見られます。能力（速さ・切り返し・高さ・キャッチ・正確さ・パワー・反応・賢さ・体力）は、試合の動きにそのまま効きます。' },
+      { img: 'g_drill', title: '攻撃練習', text: '攻めだけをくり返す練習です。守りの強さ（なし・弱い・ふつう・強い）を選べて、5点取ると、パスの成功率などの成績が出ます。' },
+      { img: 'g_throwing', title: '投げ練習', text: '自由に投げたり、お題（輪に通す・壁を越す・風を読む・特殊スロー）に挑戦したりできます。右上の設定で、投げる選手を選べます。' },
+    ] },
+  ];
+  const PAGES = []; CH.forEach((c, ci) => c.pages.forEach((p) => PAGES.push(Object.assign({ ch: ci }, p))));
+  const txt = (t) => (typeof t === 'string' ? t : IS_TOUCH ? t.touch : t.pc);
+
+  const box = document.createElement('div'); box.id = 'tutBox';
+  const css = document.createElement('style');
+  css.textContent = `#tutBox { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; background: rgba(4,8,18,.78); font-family: "Meiryo UI", "Meiryo", sans-serif; color: #fff; }
+    #tutBox .w { display: flex; width: min(1080px, 96vw); height: min(640px, 94vh); background: rgba(16,24,48,.98); border-radius: 14px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+    #tutBox .toc { width: 200px; flex: none; padding: 14px 10px; background: rgba(255,255,255,.04); overflow: auto; box-sizing: border-box; }
+    #tutBox .toc h2 { margin: 0 6px 10px; font-size: 13px; color: #C7CDFD; letter-spacing: .08em; }
+    #tutBox .toc button { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: #dfe4f7; background: none; border: 0; border-left: 3px solid transparent; padding: 8px 10px; cursor: pointer; border-radius: 0 6px 6px 0; }
+    #tutBox .toc button.on { border-left-color: var(--team, #7889FB); background: rgba(255,255,255,.08); color: #fff; font-weight: bold; }
+    #tutBox .main { flex: 1; display: flex; flex-direction: column; padding: 16px 20px 12px; box-sizing: border-box; min-width: 0; position: relative; }
+    #tutBox .main .ch { font-size: 12px; color: #C7CDFD; margin: 0 40px 4px 0; }
+    #tutBox .main img { width: 100%; max-height: 60%; object-fit: contain; border-radius: 10px; background: #0f1830; flex: none; }
+    #tutBox .main h3 { margin: 10px 0 4px; font-size: 19px; }
+    #tutBox .main .tx { margin: 0; font-size: 14px; line-height: 1.7; color: #e6eafc; overflow: auto; }
+    #tutBox .main .nt { margin: 6px 0 0; font-size: 12px; color: #FFE650; }
+    #tutBox .nav { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 10px; }
+    #tutBox .nav button { font: inherit; font-size: 14px; color: #fff; border: 0; border-radius: 9px; padding: 8px 20px; background: #7889FB; cursor: pointer; } #tutBox .nav button.sub { background: rgba(255,255,255,.16); } #tutBox .nav button:disabled { opacity: .35; cursor: default; }
+    #tutBox .nav .pg { font-size: 13px; color: #C7CDFD; }
+    #tutBox .x { position: absolute; top: 10px; right: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: #fff; font-size: 18px; cursor: pointer; }
+    @media (max-height: 460px) { #tutBox .w { height: 96vh; } #tutBox .toc { width: 150px; padding: 8px 6px; } #tutBox .toc button { font-size: 11px; padding: 5px 8px; } #tutBox .main { padding: 8px 12px 8px; }
+      #tutBox .main img { max-height: 46%; } #tutBox .main h3 { font-size: 15px; margin: 6px 0 2px; } #tutBox .main .tx { font-size: 12px; line-height: 1.55; } #tutBox .nav { padding-top: 4px; } #tutBox .nav button { padding: 5px 14px; font-size: 12px; } }`;
+  let cur = 0;
+  function draw() {
+    const p = PAGES[cur], c = CH[p.ch];
+    box.innerHTML = `<div class="w"><nav class="toc"><h2>遊び方</h2>${CH.map((cc, i) => `<button data-c="${i}" class="${i === p.ch ? 'on' : ''}">${i + 1}. ${cc.name}</button>`).join('')}</nav>`
+      + `<div class="main"><div class="ch">${p.ch + 1}. ${c.name}</div><img src="${IMG(p.img)}" alt=""><h3>${p.title}</h3><p class="tx">${txt(p.text)}</p>${p.note ? `<p class="nt">※ ${p.note}</p>` : ''}`
+      + `<div class="nav"><button class="sub" data-a="prev" ${cur === 0 ? 'disabled' : ''}>← 前へ</button><span class="pg">${cur + 1} / ${PAGES.length}</span>`
+      + `<button data-a="next">${cur === PAGES.length - 1 ? 'おわり' : '次へ →'}</button></div><button class="x" aria-label="閉じる">✕</button></div></div>`;
+    box.querySelectorAll('.toc button').forEach((b) => b.addEventListener('click', () => { cur = PAGES.findIndex((q) => q.ch === +b.dataset.c); draw(); }));
+    box.querySelector('[data-a=prev]').addEventListener('click', () => { if (cur > 0) { cur--; draw(); } });
+    box.querySelector('[data-a=next]').addEventListener('click', () => { if (cur < PAGES.length - 1) { cur++; draw(); } else close(); });
+    box.querySelector('.x').addEventListener('click', close);
+  }
+  const key = (e) => { if (box.style.display !== 'flex') return; if (e.key === 'ArrowRight' && cur < PAGES.length - 1) { cur++; draw(); } else if (e.key === 'ArrowLeft' && cur > 0) { cur--; draw(); } else if (e.key === 'Escape') close(); };
+  function open(page = 0) {
+    if (!box.isConnected) { document.head.appendChild(css); document.body.appendChild(box); addEventListener('keydown', key); }
+    cur = Math.max(0, Math.min(PAGES.length - 1, page)); draw(); box.style.display = 'flex';
+    try { localStorage.setItem('ufps_tut_seen', '1'); } catch (e) { /* 覚えられない環境 */ }
+    PAGES.forEach((q) => { const im = new Image(); im.src = IMG(q.img); });   // 次のページの絵を先に読んでおく
+  }
+  function close() { box.style.display = 'none'; }
+  const seen = () => { try { return localStorage.getItem('ufps_tut_seen') === '1'; } catch (e) { return true; } };
+  window.Tutorial = { open, close, seen, PAGES, CH };
 })();
 
 </script>
@@ -537,7 +710,10 @@ window.UFPS_ROSTER_LEGENDS_BLUE = {
   const settings = document.getElementById('settings');
   document.getElementById('openSettings').addEventListener('click', () => { st = load(); paint(); settings.style.display = 'flex'; });
   document.getElementById('closeSettings').addEventListener('click', () => { settings.style.display = 'none'; });
-  document.getElementById('openTeam').addEventListener('click', () => TeamUI.open({ ok: '決定', onDone: applyTeam }));   // チーム作り（試合の前にも出る）
+  document.getElementById('openTeam').addEventListener('click', () => TeamUI.open({ ok: '決定', onDone: applyTeam }));
+  // 遊び方（チュートリアル）: 設定の一番上から。初めてホームを開いたときだけ自動で開く（2026-11-21）
+  document.getElementById('openTut').addEventListener('click', () => { settings.style.display = 'none'; Tutorial.open(); });
+  if (window.Tutorial && !Tutorial.seen()) setTimeout(() => Tutorial.open(), 600);   // チーム作り（試合の前にも出る）
 })();
 </script>
 <script>
