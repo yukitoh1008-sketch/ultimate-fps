@@ -1571,11 +1571,26 @@ window.LOOK_COLOR = {
     function bodyScale(sc) { sc.updateMatrixWorld(true); const q = new THREE.Vector3(); let top = 0;
       sc.traverse((o) => { if (/HeadTop_End$/.test(o.name)) { o.getWorldPosition(q); top = q.y; } });
       return top > 0 ? HEIGHT / top : 0.01; }
+    // スマホでは画像を小さくしてから使う（2026-11-22。iPhone でメモリが足りずに落ちたため）。?small=1 でパソコンでも同じに
+    const SMALL_TEX = (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform)) || /[?&]small=1/.test(location.search)) ? 512 : 0;
+    R3D.smallTex = SMALL_TEX;
+    const shrunk = new WeakSet();
+    function shrinkTex(tex) {
+      if (!SMALL_TEX || !tex || shrunk.has(tex)) return;
+      const im = tex.image; if (!im || !im.width) return;
+      const w = im.width, h = im.height, m = Math.max(w, h); if (m <= SMALL_TEX) { shrunk.add(tex); return; }
+      const k = SMALL_TEX / m, c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      if (im.close) try { im.close(); } catch (e) {}   // 元の大きい画像は手放す
+      tex.image = c; tex.needsUpdate = true; shrunk.add(tex);
+    }
+    function shrinkScene(sc) { if (SMALL_TEX) sc.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) for (const k of ['map', 'emissiveMap', 'normalMap', 'shadeMultiplyTexture', 'matcapTexture']) if (m[k] && m[k].isTexture) shrinkTex(m[k]); }); }
     const BODY = {};
     const BODY_KEYS = window.VIEW && window.VIEW.r ? [window.VIEW.r.body || 'm'] : Object.keys(VRM_BODIES);   // 選手の画面は、その1人の体だけ（2026-11-22）
     for (const [key, url] of Object.entries(VRM_BODIES).filter(([k]) => BODY_KEYS.includes(k))) {
       try {
         const vg = await new Promise((res, rej) => new GLTFLoader().load(url, res, key === 'm' ? (e) => { if (e.total) R3D.progress = e.loaded / e.total; } : undefined, rej));
+        shrinkScene(vg.scene);   // スマホでは画像を小さく（2026-11-22）
         const k = rebindToMixamo(vg.scene, RIG);
         if (!k) continue;
         const bc = {};
@@ -1867,6 +1882,7 @@ window.LOOK_COLOR = {
       const NEED_KEYS = new Set(), RS = window.VIEW && window.VIEW.r ? [window.VIEW.r] : (window.UFPS_ROSTER || []).slice(0, 2).flatMap((tm) => Object.values(tm));
       for (const rr of RS) { const lk = rr.look || {}; if (lk.hs) NEED_KEYS.add(lk.hs); if (lk.face) NEED_KEYS.add('f' + lk.face); if (lk.acc === 'glassesV') NEED_KEYS.add('gV'); }
       const loads = LIST.filter(([key]) => !RS.length || NEED_KEYS.has(key)).map(([key, file]) => new Promise((res) => new GLTFLoader().load('assets/hair/' + file + '.glb', (g) => {
+        shrinkScene(g.scene);   // スマホでは画像を小さく（2026-11-22）
         const parts = []; g.scene.traverse((o) => { if (o.isMesh) parts.push({ geo: o.geometry, map: o.material.map, name: o.material.name, mat: o.material, dict: o.morphTargetDictionary }); });   // 部品ごと（色の画像も部品ごと）
         if (parts.length) VHAIR[key] = { parts, topY: (g.parser.json.extras || {}).headTopY || 0.2 };
         res();
