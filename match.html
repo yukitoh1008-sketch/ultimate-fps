@@ -1684,7 +1684,8 @@ window.LOOK_COLOR = {
       sc.traverse((o) => { if (/HeadTop_End$/.test(o.name)) { o.getWorldPosition(q); top = q.y; } });
       return top > 0 ? HEIGHT / top : 0.01; }
     const BODY = {};
-    for (const [key, url] of Object.entries(VRM_BODIES)) {
+    const BODY_KEYS = window.VIEW && window.VIEW.r ? [window.VIEW.r.body || 'm'] : Object.keys(VRM_BODIES);   // 選手の画面は、その1人の体だけ（2026-11-22）
+    for (const [key, url] of Object.entries(VRM_BODIES).filter(([k]) => BODY_KEYS.includes(k))) {
       try {
         const vg = await new Promise((res, rej) => new GLTFLoader().load(url, res, key === 'm' ? (e) => { if (e.total) R3D.progress = e.loaded / e.total; } : undefined, rej));
         const k = rebindToMixamo(vg.scene, RIG);
@@ -1699,7 +1700,7 @@ window.LOOK_COLOR = {
         BODY[key] = { scene: vg.scene, clips: bc, SCALE: bodyScale(vg.scene) };
       } catch (e) { console.warn('VRoid の体を読めない: ' + key, e); }
     }
-    const DEF = BODY.m;
+    const DEF = BODY.m || Object.values(BODY)[0];   // 選手の画面で女性・大柄の人は、その体がふだんの体
     if (!DEF) { R3D.error = '選手の体（assets/vroid/vroid_m.vrm）を読み込めない'; return; }
     R3D.body = 'vroid';
     R3D.bodies = Object.keys(BODY);
@@ -1974,7 +1975,10 @@ window.LOOK_COLOR = {
     (async () => {
       const LIST = [['v1', 'vroid_hair1'], ['v2', 'vroid_hair2'], ['v3', 'vroid_hair3'], ['v4', 'vroid_hair4'], ['v5', 'vroid_hair5'], ['v6', 'vroid_hair6'], ['m1', 'vroid_hair_m1'], ['m2', 'vroid_hair_m2'], ['m3', 'vroid_hair_m3'], ['m5', 'vroid_hair_m5'], ['c7', 'vroid_hair_c7'], ['c11', 'vroid_hair_c11'], ['c7v2', 'vroid_hair_c7v2'], ['c7v3', 'vroid_hair_c7v3'], ['c7v3t', 'vroid_hair_c7v3t'], ['c7v3p', 'vroid_hair_c7v3p'], ['c11v2', 'vroid_hair_c11v2'], ['c11v3', 'vroid_hair_c11v3'], ['c11v3s', 'vroid_hair_c11v3s'], ['c11v3r', 'vroid_hair_c11v3r'], ['c11v4', 'vroid_hair_c11v4'], ['c11v4r', 'vroid_hair_c11v4r'], ['c11v4w', 'vroid_hair_c11v4w'], ['c11v5', 'vroid_hair_c11v5'], ['c11v5r', 'vroid_hair_c11v5r'], ['c11v5u', 'vroid_hair_c11v5u'], ['c11v5p', 'vroid_hair_c11v5p'], ['c5', 'vroid_hair_c5'], ['c21', 'vroid_hair_c21'], ['c14', 'vroid_hair_c14'], ['c3', 'vroid_hair_c3'], ['sC', 'vroid_hair_sC'], ['sV', 'vroid_hair_sV'], ['sX', 'vroid_hair_sX'], ['sY', 'vroid_hair_sY'], ['sZ', 'vroid_hair_sZ'],
         ['fC', '../face/face_C'], ['fV', '../face/face_V'], ['fX', '../face/face_X'], ['fY', '../face/face_Y'], ['fZ', '../face/face_Z'], ['fc11', '../face/face_c11'], ['fc11v5', '../face/face_c11v5'], ['gV', '../face/glasses_V']];   // f＝顔・g＝メガネ（サンプルアバター）
-      const loads = LIST.map(([key, file]) => new Promise((res) => new GLTFLoader().load('assets/hair/' + file + '.glb', (g) => {
+      // 使う物だけ読む（2026-11-22。全部読むと iPhone でメモリが足りずに落ちた）: 選手の画面ならその1人、試合ならコートの両チーム
+      const NEED_KEYS = new Set(), RS = window.VIEW && window.VIEW.r ? [window.VIEW.r] : (window.UFPS_ROSTER || []).slice(0, 2).flatMap((tm) => Object.values(tm));
+      for (const rr of RS) { const lk = rr.look || {}; if (lk.hs) NEED_KEYS.add(lk.hs); if (lk.face) NEED_KEYS.add('f' + lk.face); if (lk.acc === 'glassesV') NEED_KEYS.add('gV'); }
+      const loads = LIST.filter(([key]) => !RS.length || NEED_KEYS.has(key)).map(([key, file]) => new Promise((res) => new GLTFLoader().load('assets/hair/' + file + '.glb', (g) => {
         const parts = []; g.scene.traverse((o) => { if (o.isMesh) parts.push({ geo: o.geometry, map: o.material.map, name: o.material.name, mat: o.material, dict: o.morphTargetDictionary }); });   // 部品ごと（色の画像も部品ごと）
         if (parts.length) VHAIR[key] = { parts, topY: (g.parser.json.extras || {}).headTopY || 0.2 };
         res();
